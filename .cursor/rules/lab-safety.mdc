@@ -1,5 +1,5 @@
 ---
-description: Safety and experiment-integrity rules for LangAgent-Lab
+description: Safety and experiment-integrity rules for lung-agent-lab
 alwaysApply: true
 ---
 
@@ -7,10 +7,13 @@ alwaysApply: true
 
 - Treat `../synthetic-lung-ct-evaluation` as read-only.
 - Never alter evaluator thresholds, calibration, mock benchmark logic, or scoring during a parameter search.
-- Never commit weights, medical images, environments, or generated runs.
+- Never replace the two frozen Git LFS checkpoints or commit new weights.
+- Never commit medical images, environments, or generated runs.
 - During mock optimization, edit only `workspace/candidate.json`.
 - Keep cases and seeds fixed when comparing candidates.
 - Use the fixed `data/dsr-valid/manifest.json` selection for real DSR comparisons.
 - Do not add, remove, or replace DSR cases during a parameter search.
 - Save every run and report regressions as well as improvements.
 - Do not train or fine-tune without explicit human authorization.
+- Follow `AGENT_PROMPT.md` for real searches and obey its configuration cap.
+- Never accept a candidate from the 7-case report alone; require the 37-case report.

@@ -3,9 +3,12 @@ __pycache__/
 *.pyc
 .DS_Store
 
-# Pesos e dados médicos ficam somente na máquina local.
+# Os dois checkpoints oficiais são versionados via Git LFS.
 models/*
 !models/.gitkeep
+!models/model_aekl_best_4_latent_new_lung.pth
+!models/model_ldm_pulmao_Dsr_best.pth
+!models/SHA256SUMS
 data/
 
 # Resultados reproduzíveis dos experimentos.
