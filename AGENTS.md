@@ -10,6 +10,8 @@ This repository is the writable laboratory. The sibling repository
 - Do not fine-tune or train weights unless the human explicitly authorizes it.
 - Keep AEKL weights and `scale_factor=1.0` frozen while investigating LDM sampling.
 - Compare candidates on the same cases and seeds.
+- Use the fixed `data/dsr-valid/manifest.json` selection for real DSR comparisons.
+- Do not add, remove, or replace DSR cases during a parameter search.
 
 ## Mock optimization
 

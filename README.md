@@ -29,6 +29,20 @@ Durante a busca ele pode mudar somente `workspace/candidate.json` e executar:
 Cada tentativa ganha uma pasta própria em `runs/`, e o resumo de todas fica em
 `runs/history.jsonl`. Esses resultados permanecem apenas na máquina local.
 
+## Dataset DSR válido
+
+A pasta original do DSR contém 100 pares, mas o protocolo operacional do
+avaliador aceita 37 cortes. Para montar uma visão local somente com esses
+originais e suas máscaras:
+
+```bash
+.venv/bin/python tools/prepare_dsr_dataset.py
+```
+
+O resultado fica em `data/dsr-valid/`, com `originals/`, `masks/` e um
+`manifest.json`. As imagens são links para o repositório avaliador: não são
+duplicadas e não são enviadas ao GitHub.
+
 ## Fronteira entre os projetos
 
 - **lung-agent-lab:** modelos, geração, busca de parâmetros e histórico dos experimentos.

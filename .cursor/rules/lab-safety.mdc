@@ -10,5 +10,7 @@ alwaysApply: true
 - Never commit weights, medical images, environments, or generated runs.
 - During mock optimization, edit only `workspace/candidate.json`.
 - Keep cases and seeds fixed when comparing candidates.
+- Use the fixed `data/dsr-valid/manifest.json` selection for real DSR comparisons.
+- Do not add, remove, or replace DSR cases during a parameter search.
 - Save every run and report regressions as well as improvements.
 - Do not train or fine-tune without explicit human authorization.
