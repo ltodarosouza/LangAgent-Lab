@@ -1,0 +1,14 @@
+---
+description: Safety and experiment-integrity rules for LangAgent-Lab
+alwaysApply: true
+---
+
+# Experiment integrity
+
+- Treat `../synthetic-lung-ct-evaluation` as read-only.
+- Never alter evaluator thresholds, calibration, mock benchmark logic, or scoring during a parameter search.
+- Never commit weights, medical images, environments, or generated runs.
+- During mock optimization, edit only `workspace/candidate.json`.
+- Keep cases and seeds fixed when comparing candidates.
+- Save every run and report regressions as well as improvements.
+- Do not train or fine-tune without explicit human authorization.

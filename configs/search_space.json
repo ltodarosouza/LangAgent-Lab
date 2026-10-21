@@ -1,0 +1,26 @@
+{
+  "steps": {
+    "type": "integer",
+    "min": 10,
+    "max": 100,
+    "choices": [10, 15, 25, 35, 50, 75, 100]
+  },
+  "noise_level": {
+    "type": "integer",
+    "min": 0,
+    "max": 349,
+    "choices": [0, 1, 5, 10, 25, 50]
+  },
+  "sampler": {
+    "type": "string",
+    "choices": ["ddim", "ddpm"]
+  },
+  "scale_factor": {
+    "type": "number",
+    "choices": [1.0]
+  },
+  "seed": {
+    "type": "integer",
+    "choices": [42]
+  }
+}

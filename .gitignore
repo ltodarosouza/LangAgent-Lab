@@ -10,3 +10,4 @@ data/
 
 # Resultados reproduzíveis dos experimentos.
 outputs/
+runs/

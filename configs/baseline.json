@@ -1,0 +1,7 @@
+{
+  "steps": 25,
+  "noise_level": 1,
+  "sampler": "ddim",
+  "scale_factor": 1.0,
+  "seed": 42
+}
