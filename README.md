@@ -1,4 +1,4 @@
-# LangAgent-Lab
+# LungAgent-Lab
 
 Ambiente controlado para experimentar parâmetros do gerador de tomografias
 pulmonares. Este repositório gera imagens e consome o JSON produzido pelo
@@ -31,7 +31,7 @@ Cada tentativa ganha uma pasta própria em `runs/`, e o resumo de todas fica em
 
 ## Fronteira entre os projetos
 
-- **LangAgent-Lab:** modelos, geração, busca de parâmetros e histórico dos experimentos.
+- **LungAgent-Lab:** modelos, geração, busca de parâmetros e histórico dos experimentos.
 - **synthetic-lung-ct-evaluation:** métricas, calibração e decisão sobre brilho e textura.
 
 O agente pode alterar este laboratório, mas não as regras do avaliador durante
@@ -43,7 +43,7 @@ Os dois repositórios devem ficar lado a lado:
 
 ```text
 dev/
-├── LangAgent-Lab/
+├── LungAgent-Lab/
 └── synthetic-lung-ct-evaluation/
 ```
 

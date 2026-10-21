@@ -14,7 +14,7 @@ def next_run_dir(root: Path, backend: str) -> Path:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Executa um experimento controlado do LangAgent-Lab.")
+    parser = argparse.ArgumentParser(description="Executa um experimento controlado do LungAgent-Lab.")
     parser.add_argument("--backend", choices=("mock",), default="mock")
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--runs-dir", type=Path, default=ROOT / "runs")
