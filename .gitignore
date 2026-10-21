@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+
+# Pesos e dados médicos ficam somente na máquina local.
+models/*
+!models/.gitkeep
+data/
+
+# Resultados reproduzíveis dos experimentos.
+outputs/

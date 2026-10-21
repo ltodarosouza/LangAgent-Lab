@@ -1,0 +1,8 @@
+torch==2.0.1
+monai==1.2.0
+monai-generative==0.2.2
+omegaconf==2.3.0
+numpy==1.26.4
+pillow==12.3.0
+tifffile==2025.5.10
+tqdm==4.70.1
