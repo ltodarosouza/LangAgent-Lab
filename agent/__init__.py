@@ -1,1 +1,1 @@
-"""Controlled experiment harness for LungAgent-Lab."""
+"""Controlled experiment harness for lung-agent-lab."""

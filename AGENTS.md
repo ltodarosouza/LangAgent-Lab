@@ -1,4 +1,4 @@
-# LungAgent-Lab agent contract
+# lung-agent-lab agent contract
 
 This repository is the writable laboratory. The sibling repository
 `synthetic-lung-ct-evaluation` is an external, read-only evaluator.
