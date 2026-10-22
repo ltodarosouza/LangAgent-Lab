@@ -6,7 +6,18 @@ framework externo `synthetic-lung-ct-evaluation`.
 
 ## Preparação em uma máquina nova
 
-Clone este repositório com Git LFS instalado e execute:
+Pré-requisito: o [Git LFS](https://git-lfs.com/), porque os dois checkpoints em
+`models/` só existem como arquivos LFS. É uma instalação única por máquina:
+
+- macOS com Homebrew: `brew install git-lfs`
+- Ubuntu/Debian: `sudo apt install git-lfs`
+- Windows: já vem com o Git for Windows
+- Sem gerenciador de pacotes: baixe o binário em https://git-lfs.com/ e rode
+  `sudo ./install.sh` dentro da pasta extraída
+
+Também é preciso ter o [`uv`](https://docs.astral.sh/uv/) ou o Python 3.10.
+
+Clone este repositório com o Git LFS instalado e execute:
 
 ```bash
 ./tools/bootstrap.sh
