@@ -1,5 +1,4 @@
 import argparse
-import csv
 import json
 import subprocess
 import time
@@ -12,13 +11,12 @@ import torch
 from PIL import Image
 
 from models import choose_device, load_stage1
-from settings import DATA_ROOT, EVALUATOR_HISTORY, EVALUATOR_PYTHON, EVALUATOR_REPO, ROOT
+from settings import DATA_ROOT, EVALUATOR_PYTHON, EVALUATOR_REPO, ROOT, valid_case_ids
 
 
 
 def first_valid_cases(limit: int) -> list[str]:
-    with (EVALUATOR_HISTORY.parent / "por_caso.csv").open(encoding="utf-8") as handle:
-        return list(dict.fromkeys(row["case_id"] for row in csv.DictReader(handle)))[:limit]
+    return valid_case_ids()[:limit]
 
 
 def save_preview(array: np.ndarray, output: Path, low: float, high: float) -> None:

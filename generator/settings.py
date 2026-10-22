@@ -1,3 +1,4 @@
+import json
 import os
 from pathlib import Path
 
@@ -9,6 +10,14 @@ EVALUATOR_REPO = Path(os.environ.get("TEXTURE_EVALUATOR_REPO", DEFAULT_EVALUATOR
 # chamado pelo caminho do ambiente para ativar seus pacotes.
 EVALUATOR_PYTHON = Path(os.environ.get("TEXTURE_EVALUATOR_PYTHON", EVALUATOR_REPO / ".venv" / "bin" / "python"))
 DATA_ROOT = Path(os.environ.get("LUNG_DATA_ROOT", EVALUATOR_REPO / "dados")).resolve()
-EVALUATOR_HISTORY = Path(
-    os.environ.get("TEXTURE_EVALUATOR_HISTORY", EVALUATOR_REPO / "outputs" / "placar" / "historico.json")
-).resolve()
+# Régua congelada do avaliador (tag juiz-v1): versionada, existe num clone novo.
+DEFAULT_EVALUATOR_HISTORY = EVALUATOR_REPO / "frameworks" / "texture_evaluator" / "calibracao" / "dsr-v1.json"
+EVALUATOR_HISTORY = Path(os.environ.get("TEXTURE_EVALUATOR_HISTORY", DEFAULT_EVALUATOR_HISTORY)).resolve()
+
+
+def valid_case_ids() -> list[str]:
+    """Casos DSR válidos, em ordem alfabética, tirados de `originals` na calibração."""
+    originals = json.loads(EVALUATOR_HISTORY.read_text(encoding="utf-8")).get("originals")
+    if not originals:
+        raise RuntimeError(f"calibração sem a chave 'originals': {EVALUATOR_HISTORY}")
+    return sorted(originals)

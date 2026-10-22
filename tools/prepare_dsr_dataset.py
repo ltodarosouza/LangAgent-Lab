@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import csv
 import json
 from pathlib import Path
 
@@ -10,15 +9,15 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_EVALUATOR = ROOT.parent / "synthetic-lung-ct-evaluation"
 DEFAULT_TARGET = ROOT / "data" / "dsr-valid"
+CALIBRATION = Path("frameworks") / "texture_evaluator" / "calibracao" / "dsr-v1.json"
 
 
-def case_ids_from_scoreboard(scoreboard: Path) -> list[str]:
-    with scoreboard.open(encoding="utf-8", newline="") as handle:
-        rows = list(csv.DictReader(handle))
-    case_ids = sorted({row["case_id"] for row in rows if row.get("version") == "Dsr"})
-    if not case_ids:
-        raise RuntimeError(f"nenhum caso Dsr encontrado em {scoreboard}")
-    return case_ids
+def originals_from_calibration(calibration: Path) -> dict[str, str]:
+    """Lê os casos válidos (case_id -> hash dos pixels) da régua congelada."""
+    originals = json.loads(calibration.read_text(encoding="utf-8")).get("originals")
+    if not originals:
+        raise RuntimeError(f"nenhum caso em 'originals' de {calibration}")
+    return originals
 
 
 def link_file(source: Path, target: Path) -> None:
@@ -32,10 +31,10 @@ def link_file(source: Path, target: Path) -> None:
 
 
 def prepare(evaluator: Path, target: Path) -> dict:
-    scoreboard = evaluator / "outputs" / "placar" / "por_caso.csv"
+    calibration = evaluator / CALIBRATION
     originals_source = evaluator / "dados" / "Dsr"
     masks_source = evaluator / "dados" / "Dgen"
-    case_ids = case_ids_from_scoreboard(scoreboard)
+    originals = originals_from_calibration(calibration)
 
     originals_target = target / "originals"
     masks_target = target / "masks"
@@ -43,7 +42,7 @@ def prepare(evaluator: Path, target: Path) -> dict:
     masks_target.mkdir(parents=True, exist_ok=True)
 
     cases = []
-    for case_id in case_ids:
+    for case_id in sorted(originals):
         original = originals_source / f"{case_id}.tiff"
         mask = masks_source / f"{case_id}_mask.tiff"
         link_file(original, originals_target / original.name)
@@ -52,11 +51,12 @@ def prepare(evaluator: Path, target: Path) -> dict:
             "case_id": case_id,
             "original": f"originals/{original.name}",
             "mask": f"masks/{mask.name}",
+            "pixel_sha1": originals[case_id],
         })
 
     manifest = {
         "schema_version": 1,
-        "selection_source": str(scoreboard),
+        "selection_source": str(CALIBRATION),
         "description": "DSR cases accepted by the evaluator's operational validation.",
         "case_count": len(cases),
         "cases": cases,

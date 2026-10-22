@@ -3,6 +3,7 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 evaluator_root="$(cd "${repo_root}/.." && pwd)/synthetic-lung-ct-evaluation"
+evaluator_tag="juiz-v1"
 
 cd "${repo_root}"
 
@@ -17,6 +18,17 @@ shasum -a 256 -c models/SHA256SUMS
 
 if [[ ! -d "${evaluator_root}/.git" ]]; then
   git clone https://github.com/matheuscbrito/synthetic-lung-ct-evaluation.git "${evaluator_root}"
+  git -C "${evaluator_root}" -c advice.detachedHead=false checkout "${evaluator_tag}"
+else
+  # Clone existente: não mexe nele, só avisa se não estiver no juiz esperado.
+  expected="$(git -C "${evaluator_root}" rev-parse -q --verify "${evaluator_tag}^{commit}" || true)"
+  current="$(git -C "${evaluator_root}" rev-parse HEAD)"
+  if [[ -z "${expected}" ]]; then
+    echo "AVISO: o avaliador em ${evaluator_root} não tem a tag ${evaluator_tag} (tente git fetch --tags)."
+  elif [[ "${current}" != "${expected}" ]]; then
+    echo "AVISO: o avaliador está em ${current:0:7}, não na tag ${evaluator_tag} (${expected:0:7})."
+    echo "       Para usar o juiz congelado: git -C \"${evaluator_root}\" checkout ${evaluator_tag}"
+  fi
 fi
 
 if command -v uv >/dev/null 2>&1; then

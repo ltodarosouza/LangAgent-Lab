@@ -13,9 +13,10 @@ Clone este repositório com Git LFS instalado e execute:
 ```
 
 O script baixa os dois checkpoints, confere seus hashes, prepara os ambientes,
-clona o avaliador público ao lado deste repositório quando necessário, monta os
-37 casos DSR válidos e roda apenas testes de software. Ele não gera imagens e
-não treina modelos.
+clona o avaliador público ao lado deste repositório quando necessário (já na tag
+`juiz-v1`), monta os 37 casos DSR válidos e roda apenas testes de software. Ele
+não gera imagens e não treina modelos. Se o avaliador já estiver clonado, o
+script não o altera: apenas avisa quando ele não está na tag `juiz-v1`.
 
 ## Começo rápido: laboratório mockado
 
@@ -45,15 +46,18 @@ Cada tentativa ganha uma pasta própria em `runs/`, e o resumo de todas fica em
 ## Dataset DSR válido
 
 A pasta original do DSR contém 100 pares, mas o protocolo operacional do
-avaliador aceita 37 cortes. Para montar uma visão local somente com esses
-originais e suas máscaras:
+avaliador aceita 37 cortes. A lista vem da chave `originals` da régua congelada
+`frameworks/texture_evaluator/calibracao/dsr-v1.json` do avaliador (tag
+`juiz-v1`), que é versionada; não é preciso ter `outputs/` no avaliador. Para
+montar uma visão local somente com esses originais e suas máscaras:
 
 ```bash
 .venv/bin/python tools/prepare_dsr_dataset.py
 ```
 
 O resultado fica em `data/dsr-valid/`, com `originals/`, `masks/` e um
-`manifest.json`. As imagens são links para o repositório avaliador: não são
+`manifest.json`, que guarda também o hash dos pixels de cada original registrado
+na calibração. As imagens são links para o repositório avaliador: não são
 duplicadas e não são enviadas ao GitHub.
 
 ## Avaliação real em lote
@@ -139,3 +143,8 @@ O mock não escolhe parâmetros reais automaticamente. A busca real usa
 
 Se os repositórios não estiverem lado a lado, configure
 `TEXTURE_EVALUATOR_REPO` com o caminho do avaliador.
+
+A avaliação usa como `--history` a régua congelada
+`frameworks/texture_evaluator/calibracao/dsr-v1.json` do avaliador. Para usar
+outra calibração, configure `TEXTURE_EVALUATOR_HISTORY` com o caminho do JSON
+(ele precisa das chaves `calibration` e `originals`).

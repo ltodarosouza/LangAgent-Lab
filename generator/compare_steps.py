@@ -1,5 +1,4 @@
 import argparse
-import csv
 import json
 import subprocess
 from collections import Counter
@@ -12,14 +11,12 @@ from PIL import Image
 
 from generate_one import generate_image
 from models import choose_device, load_models
-from settings import DATA_ROOT, EVALUATOR_HISTORY, EVALUATOR_PYTHON, EVALUATOR_REPO, ROOT
+from settings import DATA_ROOT, EVALUATOR_PYTHON, EVALUATOR_REPO, ROOT, valid_case_ids
 
 
 
 def first_valid_cases(limit: int) -> list[str]:
-    with (EVALUATOR_HISTORY.parent / "por_caso.csv").open(encoding="utf-8") as handle:
-        rows = csv.DictReader(handle)
-        return list(dict.fromkeys(row["case_id"] for row in rows))[:limit]
+    return valid_case_ids()[:limit]
 
 
 def save_preview(source: Path, output: Path, low: float, high: float) -> None:
