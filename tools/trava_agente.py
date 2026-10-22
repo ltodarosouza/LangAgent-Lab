@@ -10,7 +10,8 @@ continuam livres. Três camadas, porque uma regra escrita sozinha não basta:
    escrito pelo agente): as mesmas negações viram `denyWrite`/`denyRead`, rede
    só para arXiv e PyPI, e nenhum comando roda fora do sandbox.
 3. **Hook** (`hook`, roda fora do sandbox a cada ferramenta):
-   - escrita só em `workspace/candidate.json` e `runs/`;
+   - escrita só em `workspace/candidate.json`, `runs/` e `literatura/notas/`,
+     e o `CADERNO.md` só cresce: entradas antigas não são apagadas nem reescritas;
    - nada de ler o avaliador pelas ferramentas Read/Grep/Glob;
    - Python só pelos comandos aprovados, e o lote real só passa pelo
      orçamento: no máximo `--max` configurações distintas, e o lote de 37
@@ -38,13 +39,16 @@ EVALUATOR = Path(os.environ.get("TEXTURE_EVALUATOR_REPO", ROOT.parent / "synthet
 DEFAULT_MAX = 10
 
 # o que o agente pode escrever; todo o resto é negado pelo hook
-WRITABLE_FILES = ("workspace/candidate.json",)
-WRITABLE_DIRS = ("runs",)
+WRITABLE_FILES = ("workspace/candidate.json", "CADERNO.md")
+WRITABLE_DIRS = ("runs", "literatura/notas")
+# só aceitam acréscimos pelas ferramentas Edit/Write; pelo Bash, nem isso
+APPEND_ONLY = ("CADERNO.md",)
 # negados também nas permissões e no sandbox (Bash, Python), para não depender só do hook
 PROTECTED = (
     "agent", "generator", "configs", "tests", "tools", "models", "data",
     ".agente", ".claude", ".cursor", ".git",
     "AGENTS.md", "AGENT_PROMPT.md", "README.md", ".gitignore", ".gitattributes",
+    "literatura/README.md", "literatura/artigos",
 )
 # documentos do avaliador que contam conclusões; o código dele precisa continuar legível para o Python
 EVALUATOR_DOCS = ("README.md", "docs", "research", "resultados", "archive", "frameworks/texture_evaluator/README.md")
@@ -89,8 +93,11 @@ class Guard:
         """Motivo da recusa, ou None se a chamada pode seguir para as permissões normais."""
         if tool in {"Edit", "Write", "MultiEdit", "NotebookEdit"}:
             path = tool_input.get("file_path") or tool_input.get("notebook_path") or ""
-            if not self.writable(self.resolve(path, cwd)):
-                return "o agente só escreve em workspace/candidate.json e em runs/"
+            resolved = self.resolve(path, cwd)
+            if not self.writable(resolved):
+                return "o agente só escreve em workspace/candidate.json, CADERNO.md, runs/ e literatura/notas/"
+            if any(resolved == self.root / name for name in APPEND_ONLY):
+                return self.check_append(tool, tool_input, resolved)
             return None
         if tool in {"Read", "Grep", "Glob"}:
             text = json.dumps(tool_input, ensure_ascii=False)
@@ -101,6 +108,14 @@ class Guard:
         if tool == "Bash":
             return self.check_bash(tool_input.get("command", ""), cwd)
         return None
+
+    def check_append(self, tool: str, tool_input: dict, path: Path) -> Optional[str]:
+        reason = f"{path.name} só aceita acréscimos; registre a correção numa entrada nova"
+        if tool == "Write":
+            existing = path.read_text(encoding="utf-8") if path.exists() else ""
+            return None if tool_input.get("content", "").startswith(existing.rstrip("\n")) else reason
+        edits = tool_input.get("edits") if tool == "MultiEdit" else [tool_input]
+        return None if all(edit.get("old_string", "") in edit.get("new_string", "") for edit in edits or []) else reason
 
     def check_bash(self, command: str, cwd: Optional[str]) -> Optional[str]:
         if self.evaluator.name in command:
@@ -122,12 +137,29 @@ class Guard:
             return "comando Python mal formado"
         if len(argv) >= 2 and argv[0] in PYTHONS and argv[1] == "generator/run_batch.py":
             return self.check_budget(argv[2:], cwd)
+        if len(argv) >= 2 and argv[0] in PYTHONS and argv[1] == "generator/boletim.py":
+            return self.check_boletim(argv[2:], cwd)
         if argv[:3] in ([p, "-m", "agent.run_experiment"] for p in PYTHONS) and "mock" in argv:
             return None
         if argv[:3] in ([p, "-m", "unittest"] for p in PYTHONS):
             return None
         return ("Python só pelos comandos aprovados: .venv/bin/python generator/run_batch.py ..., "
+                "generator/boletim.py --run-dir ..., "
                 "python -m agent.run_experiment --backend mock ... e python -m unittest ...; para ler JSON use jq")
+
+    def check_boletim(self, args: list, cwd: Optional[str]) -> Optional[str]:
+        parser = argparse.ArgumentParser(add_help=False, exit_on_error=False)
+        parser.add_argument("--run-dir", required=True)
+        parser.add_argument("--baseline")
+        try:
+            parsed, unknown = parser.parse_known_args(args)
+        except (argparse.ArgumentError, SystemExit):
+            return "generator/boletim.py precisa de --run-dir dentro de runs/real/"
+        runs = self.root / "runs" / "real"
+        paths = [self.resolve(parsed.run_dir, cwd)] + ([self.resolve(parsed.baseline, cwd)] if parsed.baseline else [])
+        if unknown or not all(path.is_relative_to(runs) and path != runs for path in paths):
+            return "generator/boletim.py só aceita --run-dir e --baseline dentro de runs/real/"
+        return None
 
     # ------------------------------------------------------------ orçamento
 
@@ -219,7 +251,7 @@ class Guard:
                 "allowUnsandboxedCommands": False,
                 "network": {"allowedDomains": list(ALLOWED_DOMAINS)},
                 "filesystem": {
-                    "denyWrite": [str(path) for path in [*protected, self.evaluator]],
+                    "denyWrite": [str(path) for path in [*protected, *(self.root / name for name in APPEND_ONLY), self.evaluator]],
                     "denyRead": [str(path) for path in docs],
                 },
             },

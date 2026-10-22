@@ -17,6 +17,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from agent.config import load_json, validate_candidate  # noqa: E402
+from boletim import sibling_boletim, write_boletim  # noqa: E402
 from generate_one import generate_image  # noqa: E402
 from models import choose_device, load_models  # noqa: E402
 from reporting import compare_summaries, load_report, markdown_report, summarize  # noqa: E402
@@ -169,7 +170,10 @@ def main() -> None:
             **compare_summaries(payload["summary"], reference["summary"]),
         }
     persist_report(payload, run_dir)
+    # nota oficial do juiz congelado, comparada com o boletim do lote de referência quando houver
+    boletim = write_boletim(run_dir, payload, sibling_boletim(args.compare_to))
     print(f"Relatório JSON: {run_dir / 'report.json'}")
+    print(f"Boletim do juiz: {boletim}")
     print(f"Relatório legível: {run_dir / 'report.md'}")
     print(f"Nota: {payload['summary']['score']:.4f}")
 

@@ -52,6 +52,20 @@ class TravaTest(unittest.TestCase):
         for path in blocked:
             self.assertIsNotNone(self.guard.check("Edit", {"file_path": str(path)}), path)
 
+    def test_notebook_only_grows_and_literature_notes_are_writable(self):
+        notebook = self.root / "CADERNO.md"
+        notebook.write_text("# Caderno\n\n## 000 · baseline\n", encoding="utf-8")
+        old = notebook.read_text(encoding="utf-8")
+        self.assertIsNone(self.guard.check("Write", {"file_path": str(notebook), "content": old + "\n## 001 · steps\n"}))
+        self.assertIsNotNone(self.guard.check("Write", {"file_path": str(notebook), "content": "# Caderno\n"}))
+        self.assertIsNone(self.guard.check("Edit", {"file_path": str(notebook), "old_string": "baseline\n", "new_string": "baseline\n\n## 001\n"}))
+        self.assertIsNotNone(self.guard.check("Edit", {"file_path": str(notebook), "old_string": "baseline", "new_string": "melhor"}))
+        self.assertIsNone(self.guard.check("Write", {"file_path": str(self.root / "literatura" / "notas" / "freeu.md"), "content": "x"}))
+        self.assertIsNotNone(self.guard.check("Write", {"file_path": str(self.root / "literatura" / "README.md"), "content": "x"}))
+        denied = self.guard.settings()["sandbox"]["filesystem"]["denyWrite"]
+        self.assertIn(str(notebook), denied)
+        self.assertIn(str(self.root / "literatura" / "artigos"), denied)
+
     def test_evaluator_is_unreadable_through_tools_and_bash(self):
         self.assertIsNotNone(self.guard.check("Read", {"file_path": str(self.evaluator / "resultados" / "resumo.md")}))
         self.assertIsNotNone(self.guard.check("Grep", {"pattern": "AEKL", "path": str(self.root.parent)}))
@@ -67,6 +81,8 @@ class TravaTest(unittest.TestCase):
         self.assertIsNone(self.bash(".venv/bin/python -m agent.run_experiment --backend mock --config workspace/candidate.json"))
         self.assertIsNone(self.bash(".venv/bin/python -m unittest discover -s tests -v"))
         self.assertIsNone(self.bash("jq .summary runs/real/a/report.json"))
+        self.assertIsNone(self.bash(".venv/bin/python generator/boletim.py --run-dir runs/real/a --baseline runs/real/b/boletim.json"))
+        self.assertIsNotNone(self.bash(".venv/bin/python generator/boletim.py --run-dir /tmp/x"))
 
     def test_budget_counts_distinct_configurations(self):
         self.assertIsNone(self.bash(QUICK.format(name="baseline-quick") + " 2>&1 | tail -n 20"))

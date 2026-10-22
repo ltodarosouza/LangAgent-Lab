@@ -17,3 +17,7 @@ runs/
 
 # Travas e orçamento do agente (gerados por tools/agente.sh).
 .agente/
+
+# PDFs dos artigos ficam só na máquina local (direitos dos autores).
+literatura/artigos/*
+!literatura/artigos/.gitkeep

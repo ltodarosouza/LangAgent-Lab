@@ -29,6 +29,11 @@ Regras:
 4. Conte a configuração inicial dentro de `MAX_CONFIGURATIONS` e nunca exceda
    esse total.
 5. Guarde todas as tentativas, inclusive as que piorarem.
+6. Registre cada tentativa em `CADERNO.md`, seguindo o modelo do arquivo:
+   hipótese, mudança, resultado e lição, antes de escolher a próxima. Só
+   acrescente entradas; corrija uma entrada antiga com uma entrada nova.
+7. Quando uma hipótese vier de um artigo, cite-o a partir de `literatura/` e
+   deixe suas anotações em `literatura/notas/`.
 
 Fluxo:
 
@@ -51,7 +56,11 @@ Fluxo:
    `melhor`. Caso contrário, preserve a melhor anterior e tente outra hipótese.
 6. Entre as tentativas, use todas as métricas por imagem — Wavelet fina e
    grossa, GLCM, NEx, brilho, densidade e correlação — para escolher o próximo
-   teste. Inspecione as prévias dos piores casos quando isso ajudar.
+   teste. Inspecione as prévias dos piores casos quando isso ajudar. Cada lote
+   também grava `boletim.json`, a nota do juiz congelado: contagens de textura
+   e brilho, Δ de cada métrica com intervalo de 95% e, quando houver
+   `--compare-to`, a comparação corte a corte com o lote de referência. Use os
+   números dele nas entradas do caderno.
 7. Pare ao atingir `MAX_CONFIGURATIONS`, quando não houver outra hipótese segura
    dentro do espaço permitido ou quando encontrar uma configuração válida sem
    melhora defensável adicional.

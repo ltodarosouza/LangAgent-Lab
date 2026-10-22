@@ -64,7 +64,15 @@ duplicadas e não são enviadas ao GitHub.
 
 O lote rápido usa sempre os mesmos 7 cortes. O lote completo usa os 37 cortes
 válidos. Cada execução salva `report.json` com todas as métricas de todas as
-imagens, `report.md` com o resumo e prévias visuais dos pares.
+imagens, `report.md` com o resumo e prévias visuais dos pares, e `boletim.json`,
+a nota do avaliador na régua congelada `juiz-v1` (formato em
+`docs/contracts/boletim.md` do avaliador). Com `--compare-to`, o boletim também
+compara o lote, corte a corte, com o boletim do lote de referência. Para
+refazer o boletim de um lote já gerado:
+
+```bash
+.venv/bin/python generator/boletim.py --run-dir runs/real/baseline-full
+```
 
 ```bash
 .venv/bin/python generator/run_batch.py \
@@ -105,7 +113,8 @@ As regras estão em `tools/trava_agente.py`:
 - **Sandbox** (Bash e tudo o que ele chama, inclusive Python escrito pelo
   agente): as mesmas negações no sistema de arquivos, rede só para arXiv e PyPI,
   nenhum comando fora do sandbox.
-- **Hook PreToolUse:** escrita só em `workspace/candidate.json` e `runs/`;
+- **Hook PreToolUse:** escrita só em `workspace/candidate.json`, `runs/`,
+  `literatura/notas/` e `CADERNO.md`, que só aceita acréscimos;
   avaliador fora do alcance; Python só por `generator/run_batch.py`, pelo mock e
   pelos testes. O lote real só passa pelo orçamento: até `MAX_CONFIGURATIONS`
   configurações distintas, e o de 37 casos só com um rápido que disse `melhor`.
@@ -116,6 +125,14 @@ Limites conhecidos: um agente decidido ainda consegue ler o código do avaliador
 pelo Python que roda a avaliação, e o filtro de comandos do hook pode ser
 contornado com ofuscação. A trava definitiva é a do sistema operacional, com o
 avaliador e os dados pertencendo a outro usuário, prevista para a máquina com GPU.
+
+## Caderno e literatura
+
+`CADERNO.md` guarda uma entrada por tentativa (hipótese, mudança, resultado e
+lição), a começar pela linha de base `000`. Nada é apagado: correções viram
+entradas novas. `literatura/` tem o índice dos artigos que o agente pode
+consultar; os PDFs ficam em `literatura/artigos/` só na máquina local, e as
+anotações do agente em `literatura/notas/`.
 
 ## Fronteira entre os projetos
 
