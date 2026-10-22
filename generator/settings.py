@@ -15,6 +15,28 @@ DEFAULT_EVALUATOR_HISTORY = EVALUATOR_REPO / "frameworks" / "texture_evaluator" 
 EVALUATOR_HISTORY = Path(os.environ.get("TEXTURE_EVALUATOR_HISTORY", DEFAULT_EVALUATOR_HISTORY)).resolve()
 
 
+def ensure_evaluator_ready(
+    history: Path = EVALUATOR_HISTORY,
+    evaluator_python: Path = EVALUATOR_PYTHON,
+    evaluator_repo: Path = EVALUATOR_REPO,
+) -> None:
+    """Falha antes da geração quando o juiz congelado está incompleto."""
+    if not history.is_file():
+        raise RuntimeError(
+            f"calibração congelada ausente: {history}\n"
+            "rode ./tools/bootstrap.sh antes de iniciar a busca"
+        )
+    if not evaluator_python.is_file():
+        raise RuntimeError(f"Python do avaliador ausente: {evaluator_python}; rode ./tools/bootstrap.sh")
+    entrypoint = evaluator_repo / "frameworks" / "texture_evaluator" / "evaluate_one.py"
+    if not entrypoint.is_file():
+        raise RuntimeError(f"avaliador incompleto: {entrypoint}; rode ./tools/bootstrap.sh")
+    payload = json.loads(history.read_text(encoding="utf-8"))
+    missing = [key for key in ("calibration", "originals") if not payload.get(key)]
+    if missing:
+        raise RuntimeError(f"calibração inválida; campos ausentes: {', '.join(missing)}")
+
+
 def valid_case_ids() -> list[str]:
     """Casos DSR válidos, em ordem alfabética, tirados de `originals` na calibração."""
     originals = json.loads(EVALUATOR_HISTORY.read_text(encoding="utf-8")).get("originals")

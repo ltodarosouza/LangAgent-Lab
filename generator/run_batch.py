@@ -21,7 +21,7 @@ from boletim import sibling_boletim, write_boletim  # noqa: E402
 from generate_one import generate_image  # noqa: E402
 from models import choose_device, load_models  # noqa: E402
 from reporting import compare_summaries, load_report, markdown_report, summarize  # noqa: E402
-from settings import EVALUATOR_HISTORY, EVALUATOR_PYTHON, EVALUATOR_REPO  # noqa: E402
+from settings import EVALUATOR_HISTORY, EVALUATOR_PYTHON, EVALUATOR_REPO, ensure_evaluator_ready  # noqa: E402
 
 
 DATASET = ROOT / "data" / "dsr-valid" / "manifest.json"
@@ -74,6 +74,7 @@ def main() -> None:
     parser.add_argument("--device", choices=("auto", "cpu", "mps"), default="auto")
     args = parser.parse_args()
 
+    ensure_evaluator_ready()
     candidate = validate_candidate(load_json(args.config), load_json(REAL_SEARCH_SPACE))
     cases = selected_cases(args.scope)
     run_name = datetime.now().strftime(f"%Y%m%d-%H%M%S-{args.scope}")

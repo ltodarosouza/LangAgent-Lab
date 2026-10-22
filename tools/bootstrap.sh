@@ -20,15 +20,33 @@ if [[ ! -d "${evaluator_root}/.git" ]]; then
   git clone https://github.com/matheuscbrito/synthetic-lung-ct-evaluation.git "${evaluator_root}"
   git -C "${evaluator_root}" -c advice.detachedHead=false checkout "${evaluator_tag}"
 else
-  # Clone existente: não mexe nele, só avisa se não estiver no juiz esperado.
+  # Clone existente: busca o juiz e avança automaticamente apenas quando é seguro.
+  git -C "${evaluator_root}" fetch origin --tags
   expected="$(git -C "${evaluator_root}" rev-parse -q --verify "${evaluator_tag}^{commit}" || true)"
   current="$(git -C "${evaluator_root}" rev-parse HEAD)"
   if [[ -z "${expected}" ]]; then
-    echo "AVISO: o avaliador em ${evaluator_root} não tem a tag ${evaluator_tag} (tente git fetch --tags)."
+    echo "ERRO: o avaliador em ${evaluator_root} não possui a tag ${evaluator_tag}."
+    exit 1
   elif [[ "${current}" != "${expected}" ]]; then
-    echo "AVISO: o avaliador está em ${current:0:7}, não na tag ${evaluator_tag} (${expected:0:7})."
-    echo "       Para usar o juiz congelado: git -C \"${evaluator_root}\" checkout ${evaluator_tag}"
+    if [[ -n "$(git -C "${evaluator_root}" status --porcelain)" ]]; then
+      echo "ERRO: o avaliador tem alterações locais e não está na tag ${evaluator_tag}."
+      echo "      Preserve essas alterações antes de atualizar ${evaluator_root}."
+      exit 1
+    fi
+    if git -C "${evaluator_root}" merge-base --is-ancestor "${current}" "${expected}"; then
+      git -C "${evaluator_root}" merge --ff-only "${evaluator_tag}"
+    else
+      echo "ERRO: o avaliador está em ${current:0:7}, mas o juiz exige ${expected:0:7}."
+      echo "      Faça checkout da tag ${evaluator_tag} em um clone limpo."
+      exit 1
+    fi
   fi
+fi
+
+calibration="${evaluator_root}/frameworks/texture_evaluator/calibracao/dsr-v1.json"
+if [[ ! -f "${calibration}" ]]; then
+  echo "ERRO: calibração congelada ausente: ${calibration}"
+  exit 1
 fi
 
 if command -v uv >/dev/null 2>&1; then

@@ -10,7 +10,8 @@ cd "${repo_root}"
 
 max="${MAX_CONFIGURATIONS:-10}"
 
-if [[ ! -x .venv/bin/python || ! -f data/dsr-valid/manifest.json ]]; then
+calibration="${repo_root}/../synthetic-lung-ct-evaluation/frameworks/texture_evaluator/calibracao/dsr-v1.json"
+if [[ ! -x .venv/bin/python || ! -f data/dsr-valid/manifest.json || ! -f "${calibration}" ]]; then
   echo "Ambiente incompleto. Rode ./tools/bootstrap.sh antes: o agente não tem rede nem escrita para isso."
   exit 1
 fi
