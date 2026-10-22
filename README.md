@@ -87,6 +87,36 @@ métricas por imagem.
 O prompt pronto para entregar a qualquer agente está em `AGENT_PROMPT.md`. O
 campo `MAX_CONFIGURATIONS` controla quantas configurações ele pode testar.
 
+## Travas do agente
+
+Abra o agente sempre por este script, depois do `bootstrap.sh`:
+
+```bash
+MAX_CONFIGURATIONS=10 ./tools/agente.sh
+```
+
+Ele gera `.agente/settings.json` e abre o Claude Code com esse arquivo. Só essa
+sessão fica travada; sessões abertas de outro jeito nesta pasta continuam livres.
+As regras estão em `tools/trava_agente.py`:
+
+- **Permissões:** Edit/Write negados em `agent/`, `generator/`, `configs/`,
+  `tests/`, `tools/`, `models/`, `data/`, `.git/`, nas regras do projeto e no
+  avaliador; Read negado nos documentos do avaliador que contam resultados.
+- **Sandbox** (Bash e tudo o que ele chama, inclusive Python escrito pelo
+  agente): as mesmas negações no sistema de arquivos, rede só para arXiv e PyPI,
+  nenhum comando fora do sandbox.
+- **Hook PreToolUse:** escrita só em `workspace/candidate.json` e `runs/`;
+  avaliador fora do alcance; Python só por `generator/run_batch.py`, pelo mock e
+  pelos testes. O lote real só passa pelo orçamento: até `MAX_CONFIGURATIONS`
+  configurações distintas, e o de 37 casos só com um rápido que disse `melhor`.
+  O registro fica em `.agente/orcamento.jsonl`; apague a pasta para começar
+  uma busca nova.
+
+Limites conhecidos: um agente decidido ainda consegue ler o código do avaliador
+pelo Python que roda a avaliação, e o filtro de comandos do hook pode ser
+contornado com ofuscação. A trava definitiva é a do sistema operacional, com o
+avaliador e os dados pertencendo a outro usuário, prevista para a máquina com GPU.
+
 ## Fronteira entre os projetos
 
 - **lung-agent-lab:** modelos, geração, busca de parâmetros e histórico dos experimentos.

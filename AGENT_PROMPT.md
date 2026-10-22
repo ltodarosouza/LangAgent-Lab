@@ -13,9 +13,11 @@ melhorem a geração de tomografias pulmonares.
 Antes de começar, leia `AGENTS.md`, `README.md`,
 `configs/real_search_space.json` e `workspace/candidate.json`.
 
-Execute `./tools/bootstrap.sh` para preparar e verificar o ambiente. Esse passo
-não gera imagens e não treina modelos. Se ele falhar, corrija apenas a instalação
-ou reporte o bloqueio; não altere os checkpoints nem o avaliador.
+O ambiente já foi preparado por um humano com `./tools/bootstrap.sh`, e esta
+sessão roda com as travas de `tools/agente.sh`: você só escreve em
+`workspace/candidate.json` e `runs/`, não tem acesso ao avaliador e o lote real
+passa por um controle de orçamento. Se algo faltar ou uma trava impedir um passo
+legítimo, pare e reporte o bloqueio; não tente contorná-la.
 
 Regras:
 
