@@ -31,12 +31,13 @@ class TravaTest(unittest.TestCase):
     def write_candidate(self, candidate):
         (self.root / "workspace" / "candidate.json").write_text(json.dumps(candidate), encoding="utf-8")
 
-    def write_quick(self, name, candidate, verdict=None):
+    def write_quick(self, name, candidate, verdict=None, baseline="baseline-quick"):
         folder = self.root / "runs" / "real" / name
         folder.mkdir(parents=True)
         report = {"scope": "quick", "completed": True, "candidate": candidate}
         if verdict:
-            report["comparison"] = {"verdict": verdict}
+            baseline_report = self.root / "runs" / "real" / baseline / "report.json"
+            report["comparison"] = {"verdict": verdict, "baseline": str(baseline_report)}
         (folder / "report.json").write_text(json.dumps(report), encoding="utf-8")
 
     def bash(self, command):
@@ -103,6 +104,16 @@ class TravaTest(unittest.TestCase):
         self.write_quick("c2-quick", {**CANDIDATE, "steps": 60}, verdict="melhor")
         self.assertIsNone(self.bash(FULL.format(name="c2-full", quick="c2-quick")))
         self.assertIsNotNone(self.bash(QUICK.replace("quick", "full", 1).format(name="sem-reuso")))
+
+    def test_full_scope_needs_comparison_against_the_baseline(self):
+        self.guard = trava.Guard(self.root, self.evaluator, max_configurations=3)
+        self.write_quick("baseline-quick", CANDIDATE)
+        self.assertIsNone(self.bash(FULL.format(name="baseline-full", quick="baseline-quick")))
+        self.write_candidate({**CANDIDATE, "steps": 50})
+        self.write_quick("c1-quick", {**CANDIDATE, "steps": 50})
+        self.write_candidate({**CANDIDATE, "steps": 60})
+        self.write_quick("c2-quick", {**CANDIDATE, "steps": 60}, verdict="melhor", baseline="c1-quick")
+        self.assertIn("--baseline", self.bash(FULL.format(name="c2-full", quick="c2-quick")))
 
     def test_settings_lock_sandbox_and_fail_closed(self):
         settings = self.guard.settings()

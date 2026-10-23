@@ -15,8 +15,9 @@ continuam livres. Três camadas, porque uma regra escrita sozinha não basta:
    - nada de ler o avaliador pelas ferramentas Read/Grep/Glob;
    - Python só pelos comandos aprovados, e o lote real só passa pelo
      orçamento: no máximo `--max` configurações distintas, e o lote de 37
-     casos só depois de um rápido que disse "melhor". O livro-caixa fica em
-     `.agente/orcamento.jsonl`, que o agente não consegue escrever.
+     casos só depois de um rápido que disse "melhor" contra o baseline. O
+     livro-caixa fica em `.agente/orcamento.jsonl`, que o agente não consegue
+     escrever.
 
 Uso:
     python3 tools/trava_agente.py settings --max 10 > .agente/settings.json
@@ -168,12 +169,21 @@ class Guard:
             return []
         return [json.loads(line) for line in self.ledger.read_text(encoding="utf-8").splitlines() if line.strip()]
 
+    def compared_to_baseline(self, comparison: dict, baseline_key: str) -> bool:
+        """O rápido foi medido contra o baseline, a primeira configuração do orçamento?"""
+        path = comparison.get("baseline")
+        if not path or not Path(path).is_file():
+            return False
+        report = json.loads(Path(path).read_text(encoding="utf-8"))
+        return report.get("scope") == "quick" and json.dumps(report.get("candidate"), sort_keys=True) == baseline_key
+
     def check_budget(self, args: list, cwd: Optional[str]) -> Optional[str]:
         parser = argparse.ArgumentParser(add_help=False, exit_on_error=False)
         parser.add_argument("--scope", choices=("quick", "full"), required=True)
         parser.add_argument("--config", default="workspace/candidate.json")
         parser.add_argument("--output-dir", required=True)
         parser.add_argument("--reuse-report")
+        parser.add_argument("--baseline")
         parser.add_argument("--compare-to")
         parser.add_argument("--device")
         try:
@@ -209,9 +219,11 @@ class Guard:
             earlier_full = {entry["candidate_key"] for entry in entries if entry["scope"] == "full"}
             if comparison is None:
                 if earlier_full - {key}:
-                    return "só o baseline sobe para 37 casos sem comparação; compare o rápido com o melhor rápido"
+                    return "só o baseline sobe para 37 casos sem comparação; compare o rápido com --baseline"
             elif comparison.get("verdict") != "melhor":
                 return f"o lote rápido disse '{comparison.get('verdict')}'; só 'melhor' sobe para 37 casos"
+            elif entries and not self.compared_to_baseline(comparison, entries[0]["candidate_key"]):
+                return "o lote rápido precisa ter sido comparado com --baseline apontando para o rápido do baseline"
 
         self.ledger.parent.mkdir(parents=True, exist_ok=True)
         with self.ledger.open("a", encoding="utf-8") as handle:

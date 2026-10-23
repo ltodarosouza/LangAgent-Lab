@@ -1,4 +1,4 @@
-"""Gera e avalia o lote rápido de 7 cortes ou o conjunto completo de 37."""
+"""Gera e avalia o lote rápido de 10 cortes ou o conjunto completo de 37."""
 from __future__ import annotations
 
 import argparse
@@ -20,7 +20,7 @@ from agent.config import load_json, validate_candidate  # noqa: E402
 from boletim import sibling_boletim, write_boletim  # noqa: E402
 from generate_one import generate_image  # noqa: E402
 from models import choose_device, load_models  # noqa: E402
-from reporting import compare_summaries, load_report, markdown_report, summarize  # noqa: E402
+from reporting import compare_reports, load_report, markdown_report, summarize  # noqa: E402
 from settings import EVALUATOR_HISTORY, EVALUATOR_PYTHON, EVALUATOR_REPO, ensure_evaluator_ready  # noqa: E402
 
 
@@ -69,7 +69,8 @@ def main() -> None:
     parser.add_argument("--scope", choices=("quick", "full"), required=True)
     parser.add_argument("--config", type=Path, default=ROOT / "workspace" / "candidate.json")
     parser.add_argument("--output-dir", type=Path)
-    parser.add_argument("--compare-to", type=Path)
+    parser.add_argument("--baseline", type=Path, help="relatório do baseline do mesmo escopo; régua fixa da comparação")
+    parser.add_argument("--compare-to", type=Path, help="no lote completo, relatório da melhor configuração atual")
     parser.add_argument("--reuse-report", type=Path)
     parser.add_argument("--device", choices=("auto", "cpu", "mps"), default="auto")
     args = parser.parse_args()
@@ -162,17 +163,22 @@ def main() -> None:
         "summary": summarize(ordered),
         "cases": ordered,
     }
-    if args.compare_to:
-        reference = load_report(args.compare_to)
-        if reference["scope"] != args.scope:
-            raise ValueError("só é possível comparar relatórios do mesmo escopo")
+    if args.compare_to and not args.baseline:
+        raise ValueError("--compare-to exige --baseline: a comparação é sempre contra o baseline")
+    if args.baseline:
+        baseline = load_report(args.baseline)
+        best = load_report(args.compare_to) if args.compare_to else None
+        for reference in (baseline, best):
+            if reference is not None and reference["scope"] != args.scope:
+                raise ValueError("só é possível comparar relatórios do mesmo escopo")
         payload["comparison"] = {
-            "reference": str(args.compare_to.resolve()),
-            **compare_summaries(payload["summary"], reference["summary"]),
+            "baseline": str(args.baseline.resolve()),
+            "reference": str(args.compare_to.resolve()) if args.compare_to else None,
+            **compare_reports(payload, baseline, best),
         }
     persist_report(payload, run_dir)
     # nota oficial do juiz congelado, comparada com o boletim do lote de referência quando houver
-    boletim = write_boletim(run_dir, payload, sibling_boletim(args.compare_to))
+    boletim = write_boletim(run_dir, payload, sibling_boletim(args.compare_to or args.baseline))
     print(f"Relatório JSON: {run_dir / 'report.json'}")
     print(f"Boletim do juiz: {boletim}")
     print(f"Relatório legível: {run_dir / 'report.md'}")

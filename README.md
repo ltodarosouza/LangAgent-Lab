@@ -73,7 +73,7 @@ duplicadas e não são enviadas ao GitHub.
 
 ## Avaliação real em lote
 
-O lote rápido usa sempre os mesmos 7 cortes. O lote completo usa os 37 cortes
+O lote rápido usa sempre os mesmos 10 cortes. O lote completo usa os 37 cortes
 válidos. Cada execução salva `report.json` com todas as métricas de todas as
 imagens, `report.md` com o resumo e prévias visuais dos pares, e `boletim.json`,
 a nota do avaliador na régua congelada `juiz-v1` (formato em
@@ -98,10 +98,17 @@ refazer o boletim de um lote já gerado:
   --output-dir runs/real/baseline-full
 ```
 
-Para comparar uma nova tentativa, acrescente `--compare-to` apontando para o
-melhor relatório anterior do mesmo tamanho. A comparação primeiro evita novas
-rejeições e depois usa a nota como resumo; o agente também deve ler todas as
-métricas por imagem.
+Para comparar uma nova tentativa, acrescente `--baseline` apontando para o
+relatório do baseline do mesmo tamanho; no lote completo, acrescente também
+`--compare-to` com o melhor relatório completo atual. A régua é a mesma nos dois
+tamanhos: para cada distância até a original (`glcm_contrast_z`,
+`glcm_energy_z`, `wavelet_fine_z`, `wavelet_coarse_z`, `wavelet_entropy_z`,
+`wavelet_ll_z`, `nex_delta`), a melhora é `1 − média|candidato| /
+média|baseline|` nos mesmos casos, com teto de 50% por métrica. A média das 7
+precisa chegar a 15% para o veredito `melhor`; no lote completo, ela também
+precisa superar a da melhor atual. Mais rejeições ou pares fora de `ok` que o
+baseline dão `pior`. A nota continua no relatório, só como informação; o agente
+também deve ler todas as métricas por imagem.
 
 O prompt pronto para entregar a qualquer agente está em `AGENT_PROMPT.md`. O
 campo `MAX_CONFIGURATIONS` controla quantas configurações ele pode testar.
@@ -128,7 +135,8 @@ As regras estão em `tools/trava_agente.py`:
   `literatura/notas/` e `CADERNO.md`, que só aceita acréscimos;
   avaliador fora do alcance; Python só por `generator/run_batch.py`, pelo mock e
   pelos testes. O lote real só passa pelo orçamento: até `MAX_CONFIGURATIONS`
-  configurações distintas, e o de 37 casos só com um rápido que disse `melhor`.
+  configurações distintas, e o de 37 casos só com um rápido que disse `melhor`
+  contra o baseline.
   O registro fica em `.agente/orcamento.jsonl`; apague a pasta para começar
   uma busca nova.
 

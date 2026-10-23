@@ -1,6 +1,6 @@
 {
-  "description": "Seven fixed DSR cases selected to span the baseline distribution of real-image texture metrics.",
-  "case_count": 7,
+  "description": "Ten fixed DSR cases selected to span the baseline distribution of real-image texture metrics. The last three were added by greedy farthest-point selection over rank-normalized real-image GLCM, Wavelet and NEx metrics.",
+  "case_count": 10,
   "cases": [
     "1.000000-P4P117S305I00003 Gated 0.0A-96421-1-46",
     "1.000000-P4P117S302I00009 Gated 60.0A-40067-1-047",
@@ -8,6 +8,9 @@
     "1.000000-P4P117S300I00005 Gated 20.0A-79282-1-36",
     "1.000000-P4P105S300I00004 Gated 0.0A-69532-1-059",
     "1.000000-P4P117S300I00008 Gated 50.0A-92363-1-27",
-    "1.000000-P4P105S300I00011 Gated 70.0A-12662-1-031"
+    "1.000000-P4P105S300I00011 Gated 70.0A-12662-1-031",
+    "1.000000-P4P117S302I00010 Gated 70.0A-60710-1-070",
+    "1.000000-P4P100S300I00003 Gated 0.0A-29193-1-058",
+    "1.000000-P4P117S302I00003 Gated 0.0A-54642-1-054"
   ]
 }

@@ -26,8 +26,11 @@ This repository is the writable laboratory. The sibling repository
 
 - Follow `AGENT_PROMPT.md` and treat `MAX_CONFIGURATIONS` as a hard cap.
 - Edit only `workspace/candidate.json` during the search.
-- Promote a candidate from 7 to 37 cases only when its quick report improves.
-- Accept a new best candidate only after improvement on the complete 37-case report.
+- Promote a candidate from 10 to 37 cases only when its quick report says `melhor` against
+  the fixed baseline: the mean improvement of the 7 distance-to-original metrics is at least
+  15%, each metric capped at +50%, with no extra rejected cases or pair issues.
+- Accept a new best candidate only when the complete 37-case report clears the same rule
+  against the baseline and beats the current best's mean improvement.
 - Read per-case metrics and previews; never optimize from the aggregate score alone.
 
 ## Completion
