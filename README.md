@@ -90,18 +90,18 @@ refazer o boletim de um lote já gerado:
 ```bash
 .venv/bin/python generator/run_batch.py \
   --scope screen \
-  --config workspace/candidate.json \
+  --config configs/baseline.json \
   --output-dir runs/real/baseline-screen
 
 .venv/bin/python generator/run_batch.py \
   --scope quick \
-  --config workspace/candidate.json \
+  --config configs/baseline.json \
   --reuse-report runs/real/baseline-screen/report.json \
   --output-dir runs/real/baseline-quick
 
 .venv/bin/python generator/run_batch.py \
   --scope full \
-  --config workspace/candidate.json \
+  --config configs/baseline.json \
   --reuse-report runs/real/baseline-quick/report.json \
   --output-dir runs/real/baseline-full
 ```

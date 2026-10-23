@@ -43,11 +43,18 @@ primeira configuração do orçamento.
 
 Se não existir, crie o baseline cumulativo:
 
-1. `--scope screen` em `runs/real/baseline-screen` (5 casos);
+1. `--scope screen --config configs/baseline.json` em
+   `runs/real/baseline-screen` (5 casos);
 2. `--scope quick` em `runs/real/baseline-quick`, com
+   `--config configs/baseline.json` e
    `--reuse-report runs/real/baseline-screen/report.json` (só gera mais 5);
 3. `--scope full` em `runs/real/baseline-full`, com
+   `--config configs/baseline.json` e
    `--reuse-report runs/real/baseline-quick/report.json` (só gera os 27 restantes).
+
+Depois, trate `workspace/candidate.json` como a primeira configuração candidata
+e compare-a com esses três baselines. No primeiro lote completo, use
+`runs/real/baseline-full/report.json` também como `--compare-to`.
 
 ## Funil de cada configuração
 
