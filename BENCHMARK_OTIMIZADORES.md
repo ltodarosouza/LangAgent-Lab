@@ -4,6 +4,14 @@ Pergunta da apresentação: com o mesmo orçamento, um otimizador determinístic
 acha parâmetros tão bons quanto o agente? Este é o primeiro passo, só no **mock**, que é
 barato e determinístico. Nada aqui usou o backend real.
 
+> **Isto não é evidência sobre a busca real.** `agent/mock_backend.py` ignora `eta`,
+> `latent_noise_scale` e `conditioning_noise_scale`; só `steps`, `noise_level` e `sampler`
+> mudam o score, e o ótimo fica perto de `steps` ≈ 34 com `noise_level` 1. No real, os
+> parâmetros que o mock ignora são justamente as alavancas mais fortes. O resultado abaixo
+> serve **só como teste de que o código do benchmark funciona** (orçamento, reaproveitamento,
+> restrições, curvas). Não use esses números para dizer que otimizador clássico empata com
+> o agente, nem que perde para ele, no problema real.
+
 Como reproduzir (precisa de Python ≥ 3.10; scipy, optuna, cma e matplotlib são opcionais,
 e o método sem a dependência é pulado):
 
@@ -107,7 +115,7 @@ cubo, o primeiro vértice do simplex cai exatamente na faixa de `steps` 35 (vizi
 lista de opções). Com passo 0,05 nunca sai da faixa do baseline; com 0,25 ou mais pula 35 e
 cai em 50.
 
-## Leitura
+## Leitura (vale só para o mock)
 
 1. **No mock, os determinísticos locais empatam com o agente** e os bayesianos chegam
    perto com folga de orçamento. Com 20 avaliações, coordenada e Nelder-Mead acham o ótimo
@@ -147,11 +155,43 @@ O que o mock **não** permite concluir:
 - A comparação justa no real precisa de orçamento igual em **casos avaliados**, não só em
   configurações, porque o agente descarta no funil com 5 casos.
 
-Conclusão honesta para a apresentação: no mock, sim, um otimizador clássico acha o mesmo
-ótimo com orçamento de 20, e os locais em 2 a 12 avaliações. Mas o mock é fácil demais para
-dizer se o agente é melhor do que eles. A pergunta só fica respondida com a versão real
-abaixo, ou com um mock mais difícil (que use `eta` e escalas, com interações e ruído),
-criado como benchmark **novo**, sem alterar o atual.
+Conclusão para a apresentação: **a pergunta continua em aberto.** O mock mostra apenas que
+o benchmark funciona: todos os métodos rodam com o mesmo orçamento, partindo do mesmo
+baseline, e o registro de restrições e curvas sai certo. Ele não diz nada sobre quem acha
+parâmetros melhores no LDM real. A resposta exige a versão real abaixo ou, como passo
+intermediário sem GPU, o surrogate proposto na próxima seção, que também tem limites.
+
+## Proposta (não implementada): surrogate ajustado às configurações reais
+
+Ideia: trocar o mock por um modelo ajustado às ~21 configurações reais do CADERNO (L1–L9,
+M1–M12) e rodar o mesmo script contra ele, ainda sem GPU.
+
+- **Dados:** cada tentativa com relatório vira um ponto (5 parâmetros ativos → melhora média
+  contra o baseline e, se os relatórios em `runs/real/` existirem, as sete métricas e os
+  vereditos por caso). Peso maior para o escopo de 37 casos; os escopos de 5 e 10 entram
+  como fidelidade menor, com mais ruído.
+- **Modelo:** GP com kernel ARD (um comprimento por parâmetro) para a melhora, mais um
+  classificador simples de validade (rejeições e pares inválidos, alimentado por M2
+  `noise_level` 50 e M5 `latent` 1,10). Para não premiar um único mundo inventado, cada
+  repetição do benchmark sorteia uma **amostra da posterior** do GP como função objetivo.
+- **Validação antes de usar:** erro de leave-one-out nas configurações com 37 casos e
+  checagem de que o surrogate reproduz as tendências do CADERNO (`eta` sobe até 0,4,
+  `steps` 45 piora, `conditioning` ajuda só com `eta` e `steps` altos).
+
+Limitações, que precisam ir junto com qualquer resultado:
+
+- **Poucos pontos para 5 dimensões.** São ~21 tentativas, das quais umas 15 têm número
+  (L3, L4, M5 e M9 pararam sem melhora mensurável) e menos ainda com 37 casos.
+- **Viés a favor do agente.** Os pontos vêm da trajetória do próprio agente, que ficou em
+  `steps` 25–50, `eta` 0–0,4, `conditioning` 1,0–1,4 e `latent` 1,0. Fora disso (`eta` >
+  0,4, `conditioning` 1,5, `latent` < 1, `noise_level` alto) o surrogate só extrapola: um
+  otimizador que explore lá será premiado ou punido por uma superfície inventada.
+- **Escopos e regras misturados.** 5, 10 e 37 casos, e tentativas paradas pela regra antiga
+  dos 15%, não são diretamente comparáveis.
+- **Sem ruído real entre casos** se só a média for modelada; o agente decide olhando caso
+  por caso, e o surrogate agregado tira essa vantagem dele.
+- Qualquer ótimo encontrado no surrogate é **hipótese**, não resultado: precisa passar pelo
+  funil real, com autorização, antes de ir para o CADERNO.
 
 ## Desenho (não executado) da versão real com multi-fidelidade
 
