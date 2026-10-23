@@ -1,0 +1,5 @@
+# Dependências extras de tools/otimizador_real.py (só no branch do experimento).
+# Testado com o .venv do repo (Python 3.10, torch 2.0.1, numpy 1.26.4).
+# scipy 1.15 falha ao carregar no macOS 27; 1.13.1 funciona.
+scipy==1.13.1
+optuna==5.0.0

@@ -130,3 +130,24 @@ Pistas a confirmar, nenhuma executada:
 3. Só depois, `steps` entre 30 e 40, porque o efeito depende dos outros dois.
 
 Antes de gastar orçamento, copie os relatórios da melhor atual (ver "Atenção ao retomar").
+
+## Experimento separado: otimizadores clássicos (O)
+
+**Não é continuação da busca do agente.** Exceção ao protocolo autorizada por Matheus só
+no branch `claude/otimizador-real`: um script (`tools/otimizador_real.py`), e não o agente,
+propõe as configurações e escreve `workspace/candidate.json` (restaurado no fim). Objetivo:
+comparar GP-BO com restrições e Nelder-Mead com o agente, no mesmo funil 5 → 10 → 37, com a
+mesma régua (baseline fixo) e o mesmo orçamento em casos gerados. Os otimizadores não leem
+este caderno nem medições antigas, e o resultado deles não muda a "Melhor atual" acima sem
+decisão humana.
+
+Orçamento = casos gerados pela busca M4–M12 = **269** (7 configurações até 37 casos ×
+(5 + 5 + 27) = 259, mais M5 e M9 parados em 5 = 10). M1–M3 e o baseline ficam de fora.
+Desenho, decisões e comandos: `OTIMIZADOR_REAL.md`.
+
+Estado: código pronto e testado só no backend simulado; **nenhuma geração real feita**.
+Quando rodar, cada configuração vira uma linha aqui com prefixo "OG" (GP-BO) ou "ON"
+(Nelder-Mead).
+
+| # | método | configuração | escopo final | melhora vs baseline | veredito |
+|---|---|---|---|---|---|
