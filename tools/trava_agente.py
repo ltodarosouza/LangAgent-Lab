@@ -180,9 +180,10 @@ class Guard:
     def state_report(self, state: dict, group: str, scope: str) -> Path:
         return self.resolve(state[group][scope], str(self.root))
 
-    def expected_best_full(self, state: dict, entries: list) -> Path:
-        """Segue promoções completas encadeadas a partir da melhor inicial."""
-        current = self.state_report(state, "current_best", "full")
+    def expected_best(self, state: dict, entries: list, scope: str) -> Path:
+        """Segue promoções completas e devolve a etapa da melhor operacional atual."""
+        current_full = self.state_report(state, "current_best", "full")
+        current_scope = self.state_report(state, "current_best", scope)
         for entry in entries:
             if entry.get("scope") != "full":
                 continue
@@ -193,9 +194,20 @@ class Guard:
             comparison = report.get("comparison") or {}
             reference = comparison.get("reference")
             if (report.get("completed") and comparison.get("verdict") == "melhor" and reference
-                    and self.resolve(reference, str(self.root)) == current):
-                current = report_path.resolve()
-        return current
+                    and self.resolve(reference, str(self.root)) == current_full):
+                current_full = report_path.resolve()
+                if scope == "full":
+                    current_scope = current_full
+                    continue
+                candidate = report.get("candidate")
+                for stage_entry in entries:
+                    if stage_entry.get("scope") != scope or stage_entry.get("candidate") != candidate:
+                        continue
+                    stage_path = self.resolve(stage_entry["output_dir"], str(self.root)) / "report.json"
+                    if stage_path.is_file():
+                        current_scope = stage_path.resolve()
+                        break
+        return current_scope
 
     def compared_to_baseline(self, comparison: dict, baseline_key: str, scope: str) -> bool:
         """A etapa anterior foi medida contra o baseline da primeira configuração?"""
@@ -241,6 +253,9 @@ class Guard:
             expected_baseline = self.state_report(state, "baseline", parsed.scope)
             if not parsed.baseline or self.resolve(parsed.baseline, cwd) != expected_baseline:
                 return f"use --baseline {expected_baseline.relative_to(self.root)}: a régua fixa não muda com o ponto de partida"
+            expected_reference = self.expected_best(state, entries, parsed.scope)
+            if not parsed.compare_to or self.resolve(parsed.compare_to, cwd) != expected_reference:
+                return f"use --compare-to {expected_reference.relative_to(self.root)}: compare diretamente com a melhor atual"
 
         if parsed.scope in {"quick", "full"}:
             previous_scope = "screen" if parsed.scope == "quick" else "quick"
@@ -264,10 +279,9 @@ class Guard:
                 baseline_previous = self.state_report(state, "baseline", previous_scope)
                 if self.resolve(comparison.get("baseline", ""), cwd) != baseline_previous:
                     return f"a {previous_label} precisa usar o baseline fixado em workspace/search_state.json"
-                if parsed.scope == "full":
-                    expected_best = self.expected_best_full(state, entries)
-                    if not parsed.compare_to or self.resolve(parsed.compare_to, cwd) != expected_best:
-                        return f"use --compare-to {expected_best.relative_to(self.root)}: essa é a melhor completa atual"
+                expected_previous = self.expected_best(state, entries, previous_scope)
+                if self.resolve(comparison.get("reference", ""), cwd) != expected_previous:
+                    return f"a {previous_label} precisa ter sido comparada diretamente com a melhor atual"
             elif entries and not self.compared_to_baseline(comparison, entries[0]["candidate_key"], previous_scope):
                 return f"a {previous_label} precisa ter sido comparada com o baseline da mesma etapa"
 

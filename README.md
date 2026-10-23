@@ -107,17 +107,18 @@ refazer o boletim de um lote já gerado:
 ```
 
 Para comparar uma nova tentativa, comece em `--scope screen` e acrescente
-`--baseline` apontando para o relatório do baseline do mesmo tamanho. Só avance
-quando o relatório disser `melhor`; no lote completo, acrescente também
-`--compare-to` com o melhor relatório completo atual. A régua é a mesma nos dois
+`--baseline` apontando para o relatório do baseline do mesmo tamanho e
+`--compare-to` apontando para a melhor atual do mesmo tamanho. Só avance quando
+o relatório disser `melhor`. A régua é a mesma nos três
 tamanhos: para cada distância até a original (`glcm_contrast_z`,
 `glcm_energy_z`, `wavelet_fine_z`, `wavelet_coarse_z`, `wavelet_entropy_z`,
 `wavelet_ll_z`, `nex_delta`), a melhora é `1 − média|candidato| /
-média|baseline|` nos mesmos casos, com teto de 50% por métrica. A média das 7
-precisa chegar a 15% para o veredito `melhor`; no lote completo, ela também
-precisa superar a da melhor atual. Mais rejeições ou pares fora de `ok` que o
-baseline dão `pior`. A nota continua no relatório, só como informação; o agente
-também deve ler todas as métricas por imagem.
+média|baseline|` nos mesmos casos, com teto de 50% por métrica. A candidata diz
+`melhor` quando supera a média da melhor atual, vence em mais cortes do que perde
+e não acrescenta rejeições ou pares inválidos. O marco de 15% aparece
+separadamente como `target_reached`: é a meta forte, não uma barreira para
+validar melhorias incrementais. A nota continua como apoio; o agente também
+deve ler todas as métricas por imagem.
 
 O prompt pronto para entregar a qualquer agente está em `AGENT_PROMPT.md`. O
 campo `MAX_CONFIGURATIONS` controla quantas configurações ele pode testar.

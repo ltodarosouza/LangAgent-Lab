@@ -72,10 +72,32 @@ class RealReportingTest(unittest.TestCase):
         self.assertEqual(result["metric_improvement_pct"]["nex_delta"], 50.0)
         self.assertEqual(result["verdict"], "insuficiente")
 
-    def test_full_batch_must_beat_current_best(self):
+    def test_candidate_only_needs_to_beat_current_best_when_reference_is_given(self):
         baseline = batch(1.0)
         self.assertEqual(compare_reports(batch(0.75), baseline, best=batch(0.7))["verdict"], "insuficiente")
-        self.assertEqual(compare_reports(batch(0.6), baseline, best=batch(0.7))["verdict"], "melhor")
+        result = compare_reports(batch(0.88), baseline, best=batch(0.9))
+        self.assertEqual(result["verdict"], "melhor")
+        self.assertFalse(result["target_reached"])
+        self.assertEqual(result["case_distance_wins"], 2)
+
+    def test_target_is_reported_separately_from_being_the_best(self):
+        result = compare_reports(batch(0.8), batch(1.0), best=batch(0.9))
+        self.assertEqual(result["verdict"], "melhor")
+        self.assertTrue(result["target_reached"])
+
+    def test_aggregate_gain_must_win_more_cases_than_it_loses(self):
+        cases = ("case-1", "case-2", "case-3")
+        baseline = batch(1.0, cases=cases)
+        best = batch(0.9, cases=cases)
+        candidate = batch(1.0, cases=cases)
+        candidate["cases"][0]["evaluation"]["measurements"].update(
+            {key: 0.4 for key in DISTANCE_METRICS}
+        )
+        candidate["summary"] = summarize(candidate["cases"])
+        result = compare_reports(candidate, baseline, best)
+        self.assertEqual(result["verdict"], "insuficiente")
+        self.assertEqual(result["case_distance_wins"], 1)
+        self.assertEqual(result["case_distance_losses"], 2)
 
     def test_validity_blocks_promotion(self):
         self.assertEqual(compare_reports(batch(0.5, final="rejeitar"), batch(1.0))["verdict"], "pior")

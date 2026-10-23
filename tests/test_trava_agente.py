@@ -110,18 +110,24 @@ class TravaTest(unittest.TestCase):
         self.write_state(best)
         candidate = {**best, "conditioning_noise_scale": 1.1}
         self.write_candidate(candidate)
-        screen = SCREEN.format(name="next-screen") + " --baseline runs/real/baseline-screen/report.json"
+        screen = (SCREEN.format(name="next-screen")
+                  + " --baseline runs/real/baseline-screen/report.json"
+                  + " --compare-to runs/real/best-screen/report.json")
         self.assertIsNone(self.bash(screen))
-        self.write_stage("next-screen", "screen", candidate, "melhor")
+        self.write_stage("next-screen", "screen", candidate, "melhor",
+                         reference=self.root / "runs" / "real" / "best-screen" / "report.json")
         quick = (QUICK.format(name="next-quick", screen="next-screen")
-                 + " --baseline runs/real/baseline-quick/report.json")
+                 + " --baseline runs/real/baseline-quick/report.json"
+                 + " --compare-to runs/real/best-quick/report.json")
         self.assertIsNone(self.bash(quick))
-        self.write_stage("next-quick", "quick", candidate, "melhor")
+        self.write_stage("next-quick", "quick", candidate, "melhor",
+                         reference=self.root / "runs" / "real" / "best-quick" / "report.json")
         full = (FULL.format(name="next-full", quick="next-quick")
                 + " --baseline runs/real/baseline-full/report.json"
                 + " --compare-to runs/real/best-full/report.json")
         self.assertIsNone(self.bash(full))
-        wrong = SCREEN.format(name="wrong") + " --baseline runs/real/best-screen/report.json"
+        wrong = (SCREEN.format(name="wrong") + " --baseline runs/real/best-screen/report.json"
+                 + " --compare-to runs/real/best-screen/report.json")
         self.assertIn("régua fixa", self.bash(wrong))
 
     def test_settings_lock_sandbox(self):

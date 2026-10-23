@@ -138,35 +138,60 @@ def validity_issues(summary: dict) -> tuple[int, int]:
     return rejected, pair_issues
 
 
-def compare_reports(report: dict, baseline: dict, best: dict | None = None) -> dict:
-    """Régua única: média de melhora das métricas contra o baseline fixo.
+def paired_case_outcome(report: dict, best: dict, baseline: dict) -> tuple[int, int, int]:
+    """Vitórias pela média das sete distâncias em cada corte contra a melhor atual."""
+    current = {case["case_id"]: case for case in report["cases"]}
+    reference = {case["case_id"]: case for case in best["cases"]}
+    if set(current) != set(reference):
+        raise ValueError("o lote e a melhor atual precisam ter exatamente os mesmos casos")
+    scales = metric_distances(baseline)
 
-    No lote rápido, `melhor` autoriza os 37 casos. No lote completo, `melhor`
-    exige também superar a média da melhor configuração atual (`best`).
-    """
+    def distance(case: dict) -> float:
+        values = case["evaluation"]["measurements"]
+        return mean(
+            abs(float(values[key])) / scales[key] if scales[key] else 0.0
+            for key in DISTANCE_METRICS
+        )
+
+    wins = sum(distance(current[key]) < distance(reference[key]) for key in current)
+    losses = sum(distance(current[key]) > distance(reference[key]) for key in current)
+    return wins, losses, len(current) - wins - losses
+
+
+def compare_reports(report: dict, baseline: dict, best: dict | None = None) -> dict:
+    """Mede contra o baseline e decide promoção diretamente contra a melhor atual."""
     improvements = metric_improvements(report, baseline)
     average = round(mean(improvements.values()), 4)
     rejected, pair_issues = validity_issues(report["summary"])
-    baseline_rejected, baseline_pair_issues = validity_issues(baseline["summary"])
+    validity_reference = best or baseline
+    reference_rejected, reference_pair_issues = validity_issues(validity_reference["summary"])
     best_average = None
+    wins = losses = ties = None
     if best is not None:
         best_average = round(mean(metric_improvements(best, baseline).values()), 4)
+        wins, losses, ties = paired_case_outcome(report, best, baseline)
 
-    if rejected > baseline_rejected:
-        verdict, reason = "pior", "aumentou o número de casos rejeitados em relação ao baseline"
-    elif pair_issues > baseline_pair_issues:
-        verdict, reason = "pior", "aumentou o número de pares fora de 'ok' em relação ao baseline"
-    elif average < PROMOTION_THRESHOLD_PCT:
-        verdict = "insuficiente"
-        reason = f"melhora média {average:+.1f}% abaixo de {PROMOTION_THRESHOLD_PCT:.0f}% contra o baseline"
-    elif best_average is not None and average <= best_average:
+    if rejected > reference_rejected:
+        verdict, reason = "pior", "aumentou o número de casos rejeitados em relação à referência"
+    elif pair_issues > reference_pair_issues:
+        verdict, reason = "pior", "aumentou o número de pares fora de 'ok' em relação à referência"
+    elif best is not None and average <= best_average:
         verdict = "insuficiente"
         reason = f"melhora média {average:+.1f}% não supera a melhor atual ({best_average:+.1f}%)"
-    else:
+    elif best is not None and wins <= losses:
+        verdict = "insuficiente"
+        reason = f"ganhou em {wins} cortes e perdeu em {losses}; o ganho não predomina nos casos"
+    elif best is None and average < PROMOTION_THRESHOLD_PCT:
+        verdict = "insuficiente"
+        reason = f"melhora média {average:+.1f}% abaixo de {PROMOTION_THRESHOLD_PCT:.0f}% contra o baseline"
+    elif best is None:
         verdict = "melhor"
         reason = f"melhora média {average:+.1f}% contra o baseline, sem perder validade"
-        if best_average is not None:
-            reason += f", acima da melhor atual ({best_average:+.1f}%)"
+    else:
+        verdict = "melhor"
+        reason = f"supera a melhor atual ({best_average:+.1f}% → {average:+.1f}%)"
+        reason += f", com {wins} vitórias e {losses} derrotas por corte, sem perder validade"
+    target_reached = average >= PROMOTION_THRESHOLD_PCT
     return {
         "verdict": verdict,
         "reason": reason,
@@ -175,8 +200,12 @@ def compare_reports(report: dict, baseline: dict, best: dict | None = None) -> d
         "mean_improvement_pct": average,
         "metric_improvement_pct": improvements,
         "best_mean_improvement_pct": best_average,
-        "rejected_case_delta": rejected - baseline_rejected,
-        "pair_issue_delta": pair_issues - baseline_pair_issues,
+        "target_reached": target_reached,
+        "case_distance_wins": wins,
+        "case_distance_losses": losses,
+        "case_distance_ties": ties,
+        "rejected_case_delta": rejected - reference_rejected,
+        "pair_issue_delta": pair_issues - reference_pair_issues,
         "score_delta": round(float(report["summary"]["score"]) - float(baseline["summary"]["score"]), 4),
     }
 
@@ -217,6 +246,14 @@ def markdown_report(payload: dict) -> str:
         ]
         if comparison.get("best_mean_improvement_pct") is not None:
             lines.append(f"- Melhora média da melhor atual: {comparison['best_mean_improvement_pct']:+.2f}%")
+            lines.append(
+                f"- Vitórias/derrotas/empates por corte: {comparison['case_distance_wins']}/"
+                f"{comparison['case_distance_losses']}/{comparison['case_distance_ties']}"
+            )
+        lines.append(
+            f"- Meta forte de {comparison['threshold_pct']:.0f}%: "
+            f"{'atingida' if comparison['target_reached'] else 'ainda não atingida'}"
+        )
     worst = sorted(summary["case_scores"].items(), key=lambda item: item[1])[:5]
     lines += ["", "## Cinco piores casos", "", *[f"- {case_id}: {score:.4f}" for case_id, score in worst]]
     lines += ["", "O JSON ao lado contém todas as métricas de todas as imagens.", ""]

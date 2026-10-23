@@ -32,13 +32,17 @@ This repository is the writable laboratory. The sibling repository
   in the new budget and the next hypothesis must start from those parameters.
 - Edit only `workspace/candidate.json` during the search.
 - Use the cumulative 5 → 10 → 37 funnel. Promote 5 to 10, then 10 to 37, only when the
-  preceding report says `melhor` against the fixed baseline. Reuse completed cases.
+  preceding report says `melhor` relative to the same-size report of the current best.
+  Every comparison still uses the fixed baseline as the scientific ruler. Reuse completed cases.
 - The agent may vary `steps`, `noise_level`, `eta`, `latent_noise_scale` and
   `conditioning_noise_scale` within `configs/real_search_space.json`. Keep sampler,
   scale factor and seed frozen.
-- Accept a new best candidate only when the complete 37-case report clears the same rule
-  against the baseline and beats the current best's mean improvement.
+- Accept a new operational best when the complete 37-case report beats the current best,
+  wins in more cuts than it loses, and adds no rejected cases or invalid pairs. Report the
+  15% improvement threshold separately as a strong target, not as a promotion gate.
 - Read per-case metrics and previews; never optimize from the aggregate score alone.
+- Read `CADERNO.md` and inventory existing reports before proposing a candidate. Never
+  regenerate an exact configuration when a complete same-scope report can be reused.
 
 ## Completion
 

@@ -52,3 +52,13 @@ confirmá-las ou refutá-las.
 
 O baseline é sempre a régua fixa. A melhor versão completa serve como ponto de partida e
 como adversária adicional, mas nunca substitui o baseline na medição.
+
+`Melhor` e `meta atingida` são decisões diferentes. Uma candidata avança quando sua
+melhora média contra o baseline supera a da melhor atual, sua nota por corte vence em
+mais casos do que perde e não surgem rejeições ou pares inválidos adicionais. Os 15%
+indicam que a meta forte foi atingida, mas não bloqueiam a validação de uma melhora
+incremental. Compare sempre com `--baseline` e `--compare-to` do mesmo escopo.
+
+Antes de gerar, procure a configuração exata no `CADERNO.md` e em `runs/real/`. Um
+relatório completo existente é evidência reutilizável; não gaste orçamento nem compute
+para descobrir novamente o mesmo resultado.
