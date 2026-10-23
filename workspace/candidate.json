@@ -1,5 +1,5 @@
 {
-  "steps": 25,
+  "steps": 35,
   "noise_level": 1,
   "sampler": "ddim",
   "scale_factor": 1.0,

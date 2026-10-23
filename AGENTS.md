@@ -25,6 +25,9 @@ This repository is the writable laboratory. The sibling repository
 ## Real optimization
 
 - Follow `AGENT_PROMPT.md` and treat `MAX_CONFIGURATIONS` as a hard cap.
+- If `workspace/search_state.json` exists, use its fixed baseline and current best;
+  do not regenerate either one. Its current-best configuration is the first configuration
+  in the new budget and the next hypothesis must start from those parameters.
 - Edit only `workspace/candidate.json` during the search.
 - Promote a candidate from 10 to 37 cases only when its quick report says `melhor` against
   the fixed baseline: the mean improvement of the 7 distance-to-original metrics is at least

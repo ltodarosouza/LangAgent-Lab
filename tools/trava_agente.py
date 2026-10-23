@@ -49,6 +49,7 @@ PROTECTED = (
     "agent", "generator", "configs", "tests", "tools", "models", "data",
     ".agente", ".claude", ".cursor", ".git",
     "AGENTS.md", "AGENT_PROMPT.md", "README.md", ".gitignore", ".gitattributes",
+    "workspace/search_state.json",
     "literatura/README.md", "literatura/artigos",
 )
 # documentos do avaliador que contam conclusões; o código dele precisa continuar legível para o Python
@@ -169,6 +170,32 @@ class Guard:
             return []
         return [json.loads(line) for line in self.ledger.read_text(encoding="utf-8").splitlines() if line.strip()]
 
+    def search_state(self) -> dict | None:
+        path = self.root / "workspace" / "search_state.json"
+        if not path.is_file():
+            return None
+        return json.loads(path.read_text(encoding="utf-8"))
+
+    def state_report(self, state: dict, group: str, scope: str) -> Path:
+        return self.resolve(state[group][scope], str(self.root))
+
+    def expected_best_full(self, state: dict, entries: list) -> Path:
+        """Segue promoções completas encadeadas a partir da melhor inicial."""
+        current = self.state_report(state, "current_best", "full")
+        for entry in entries:
+            if entry.get("scope") != "full":
+                continue
+            report_path = self.resolve(entry["output_dir"], str(self.root)) / "report.json"
+            if not report_path.is_file():
+                continue
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            comparison = report.get("comparison") or {}
+            reference = comparison.get("reference")
+            if (report.get("completed") and comparison.get("verdict") == "melhor" and reference
+                    and self.resolve(reference, str(self.root)) == current):
+                current = report_path.resolve()
+        return current
+
     def compared_to_baseline(self, comparison: dict, baseline_key: str) -> bool:
         """O rápido foi medido contra o baseline, a primeira configuração do orçamento?"""
         path = comparison.get("baseline")
@@ -203,8 +230,16 @@ class Guard:
 
         entries = self.entries()
         used = {entry["candidate_key"] for entry in entries}
+        state = self.search_state()
+        if state:
+            used.add(json.dumps(state["current_best"]["candidate"], sort_keys=True))
         if key not in used and len(used) >= self.max:
             return f"orçamento esgotado: {len(used)} de {self.max} configurações já testadas; pare e reporte"
+
+        if state and key != json.dumps(state["current_best"]["candidate"], sort_keys=True):
+            expected_baseline = self.state_report(state, "baseline", parsed.scope)
+            if not parsed.baseline or self.resolve(parsed.baseline, cwd) != expected_baseline:
+                return f"use --baseline {expected_baseline.relative_to(self.root)}: a régua fixa não muda com o ponto de partida"
 
         if parsed.scope == "full":
             if not parsed.reuse_report:
@@ -222,6 +257,13 @@ class Guard:
                     return "só o baseline sobe para 37 casos sem comparação; compare o rápido com --baseline"
             elif comparison.get("verdict") != "melhor":
                 return f"o lote rápido disse '{comparison.get('verdict')}'; só 'melhor' sobe para 37 casos"
+            elif state:
+                baseline_quick = self.state_report(state, "baseline", "quick")
+                if self.resolve(comparison.get("baseline", ""), cwd) != baseline_quick:
+                    return "o lote rápido precisa usar o baseline rápido fixado em workspace/search_state.json"
+                expected_best = self.expected_best_full(state, entries)
+                if not parsed.compare_to or self.resolve(parsed.compare_to, cwd) != expected_best:
+                    return f"use --compare-to {expected_best.relative_to(self.root)}: essa é a melhor completa atual"
             elif entries and not self.compared_to_baseline(comparison, entries[0]["candidate_key"]):
                 return "o lote rápido precisa ter sido comparado com --baseline apontando para o rápido do baseline"
 

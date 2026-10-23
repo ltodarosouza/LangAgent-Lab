@@ -40,6 +40,33 @@ class TravaTest(unittest.TestCase):
             report["comparison"] = {"verdict": verdict, "baseline": str(baseline_report)}
         (folder / "report.json").write_text(json.dumps(report), encoding="utf-8")
 
+    def write_full(self, name, candidate, verdict=None, reference=None):
+        folder = self.root / "runs" / "real" / name
+        folder.mkdir(parents=True, exist_ok=True)
+        report = {"scope": "full", "completed": True, "candidate": candidate}
+        if verdict:
+            report["comparison"] = {"verdict": verdict, "reference": str(reference)}
+        (folder / "report.json").write_text(json.dumps(report), encoding="utf-8")
+        return folder / "report.json"
+
+    def write_state(self, best):
+        baseline_quick = self.root / "runs" / "real" / "baseline-quick" / "report.json"
+        baseline_full = self.root / "runs" / "real" / "baseline-full" / "report.json"
+        best_quick = self.root / "runs" / "real" / "best-quick" / "report.json"
+        best_full = self.root / "runs" / "real" / "best-full" / "report.json"
+        self.write_quick("baseline-quick", CANDIDATE)
+        self.write_full("baseline-full", CANDIDATE)
+        self.write_quick("best-quick", best, verdict="melhor")
+        self.write_full("best-full", best)
+        state = {
+            "baseline": {"quick": str(baseline_quick.relative_to(self.root)),
+                         "full": str(baseline_full.relative_to(self.root))},
+            "current_best": {"quick": str(best_quick.relative_to(self.root)),
+                             "full": str(best_full.relative_to(self.root)), "candidate": best},
+        }
+        (self.root / "workspace" / "search_state.json").write_text(json.dumps(state), encoding="utf-8")
+        return baseline_quick, baseline_full, best_full
+
     def bash(self, command):
         return self.guard.check("Bash", {"command": command}, str(self.root))
 
@@ -115,10 +142,42 @@ class TravaTest(unittest.TestCase):
         self.write_quick("c2-quick", {**CANDIDATE, "steps": 60}, verdict="melhor", baseline="c1-quick")
         self.assertIn("--baseline", self.bash(FULL.format(name="c2-full", quick="c2-quick")))
 
+    def test_continuation_uses_fixed_baseline_and_current_best(self):
+        self.guard = trava.Guard(self.root, self.evaluator, max_configurations=2)
+        best = {**CANDIDATE, "steps": 50}
+        baseline_quick, baseline_full, best_full = self.write_state(best)
+        candidate = {**CANDIDATE, "steps": 60}
+        self.write_candidate(candidate)
+        quick_command = (QUICK.format(name="next-quick")
+                         + " --baseline runs/real/baseline-quick/report.json")
+        self.assertIsNone(self.bash(quick_command))
+        self.write_quick("next-quick", candidate, verdict="melhor")
+        full_command = (FULL.format(name="next-full", quick="next-quick")
+                        + " --baseline runs/real/baseline-full/report.json"
+                        + " --compare-to runs/real/best-full/report.json")
+        self.assertIsNone(self.bash(full_command))
+
+        self.write_candidate({**CANDIDATE, "steps": 70})
+        self.assertIn("orçamento esgotado", self.bash(QUICK.format(name="extra-quick")))
+
+    def test_continuation_rejects_wrong_reference(self):
+        self.guard = trava.Guard(self.root, self.evaluator, max_configurations=3)
+        best = {**CANDIDATE, "steps": 50}
+        self.write_state(best)
+        candidate = {**CANDIDATE, "steps": 60}
+        self.write_candidate(candidate)
+        self.write_quick("next-quick", candidate, verdict="melhor")
+        no_reference = (FULL.format(name="next-full", quick="next-quick")
+                        + " --baseline runs/real/baseline-full/report.json")
+        self.assertIn("--compare-to", self.bash(no_reference))
+        wrong_baseline = QUICK.format(name="wrong-quick") + " --baseline runs/real/best-quick/report.json"
+        self.assertIn("régua fixa", self.bash(wrong_baseline))
+
     def test_settings_lock_sandbox_and_fail_closed(self):
         settings = self.guard.settings()
         self.assertFalse(settings["sandbox"]["allowUnsandboxedCommands"])
         self.assertIn(str(self.root / "agent"), settings["sandbox"]["filesystem"]["denyWrite"])
+        self.assertIn(str(self.root / "workspace" / "search_state.json"), settings["sandbox"]["filesystem"]["denyWrite"])
         self.assertIn(f"Edit(/{self.root}/models/**)", settings["permissions"]["deny"])
         hook = settings["hooks"]["PreToolUse"][0]["hooks"][0]
         self.assertEqual(hook["onFailure"], "block")

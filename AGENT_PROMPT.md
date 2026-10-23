@@ -11,7 +11,8 @@ melhorem a geração de tomografias pulmonares.
 `MAX_CONFIGURATIONS = 10`
 
 Antes de começar, leia `AGENTS.md`, `README.md`,
-`configs/real_search_space.json` e `workspace/candidate.json`.
+`configs/real_search_space.json`, `workspace/candidate.json` e, se existir,
+`workspace/search_state.json`.
 
 O ambiente já foi preparado por um humano com `./tools/bootstrap.sh`, e esta
 sessão roda com as travas de `tools/agente.sh`: você só escreve em
@@ -37,7 +38,12 @@ Regras:
 
 Fluxo:
 
-1. Execute a configuração inicial nos 10 casos fixos com `.venv/bin/python
+1. Se `workspace/search_state.json` existir, ele define o `baseline` fixo e a
+   `current_best` da nova busca. Não gere novamente nenhum dos dois. Considere
+   os parâmetros de `current_best` como a primeira configuração do orçamento,
+   parta deles para formular a próxima hipótese e siga diretamente para o
+   passo 3. Se o arquivo não existir, execute a configuração inicial nos 10
+   casos fixos com `.venv/bin/python
    generator/run_batch.py --scope quick --config workspace/candidate.json
    --output-dir runs/real/baseline-quick`. Leia o `report.json` completo, não
    apenas a nota.
@@ -57,14 +63,16 @@ Fluxo:
    `ok` que o baseline tornam o lote `pior`. A nota aparece só como informação.
    Só execute os 37 casos quando o relatório rápido disser `melhor`. No lote
    completo, use `--reuse-report CAMINHO_DO_QUICK/report.json`, `--baseline
-   runs/real/baseline-full/report.json` e `--compare-to
-   CAMINHO_DO_MELHOR_FULL/report.json`, e salve numa pasta como
+   runs/real/baseline-full/report.json` (ou `baseline.full` do estado) e
+   `--compare-to CAMINHO_DO_MELHOR_FULL/report.json` (inicialmente
+   `current_best.full` do estado), e salve numa pasta como
    `runs/real/candidate-01-full`. Enquanto o baseline for o melhor, o
    `--compare-to` aponta para ele mesmo.
 5. Uma configuração só vira a nova melhor se o relatório completo disser
    `melhor`: média de pelo menos 15% contra o baseline nos 37 casos e maior que
    a média da melhor atual. Caso contrário, preserve a melhor anterior e tente
-   outra hipótese.
+   outra hipótese. Quando um lote completo disser `melhor`, use o relatório
+   dele como `--compare-to` das próximas promoções desta mesma sessão.
 6. Entre as tentativas, use todas as métricas por imagem — Wavelet fina e
    grossa, GLCM, NEx, brilho, densidade e correlação — para escolher o próximo
    teste. Inspecione as prévias dos piores casos quando isso ajudar. Cada lote

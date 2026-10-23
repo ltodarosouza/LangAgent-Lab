@@ -19,5 +19,17 @@ fi
 mkdir -p .agente runs
 python3 tools/trava_agente.py settings --max "${max}" > .agente/settings.json
 echo "Travas ativas: até ${max} configurações; orçamento em .agente/orcamento.jsonl."
+if [[ -f workspace/search_state.json ]]; then
+  python3 - <<'PY'
+import json
+from pathlib import Path
+
+state = json.loads(Path("workspace/search_state.json").read_text(encoding="utf-8"))
+best = state["current_best"]
+print(f"Ponto de partida: {best['full']}")
+print(f"Parâmetros iniciais: {json.dumps(best['candidate'], ensure_ascii=False)}")
+print(f"Baseline fixo: {state['baseline']['full']}")
+PY
+fi
 
 exec claude --settings .agente/settings.json --permission-mode acceptEdits "$@"

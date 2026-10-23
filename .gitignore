@@ -17,6 +17,7 @@ runs/
 
 # Travas e orçamento do agente (gerados por tools/agente.sh).
 .agente/
+workspace/search_state.json
 
 # PDFs dos artigos ficam só na máquina local (direitos dos autores).
 literatura/artigos/*

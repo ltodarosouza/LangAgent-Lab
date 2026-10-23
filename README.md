@@ -113,6 +113,26 @@ também deve ler todas as métricas por imagem.
 O prompt pronto para entregar a qualquer agente está em `AGENT_PROMPT.md`. O
 campo `MAX_CONFIGURATIONS` controla quantas configurações ele pode testar.
 
+### Continuar a partir do melhor resultado já encontrado
+
+O baseline continua sendo a régua fixa, mas uma nova busca pode começar dos
+parâmetros e do relatório da melhor execução completa anterior. Antes de abrir
+o agente, rode como humano:
+
+```bash
+.venv/bin/python tools/select_starting_point.py \
+  --from-run runs/real/candidate-01-full
+```
+
+O comando encontra o lote rápido correspondente, valida os mesmos casos,
+atualiza `workspace/candidate.json`, cria o estado local
+`workspace/search_state.json` e arquiva o orçamento anterior. Ele não gera
+imagens. Sem `--from-run`, o mesmo comando apenas mostra a seleção atual.
+
+A partir daí, o baseline continua fixo em `baseline-quick/full`, enquanto o
+relatório escolhido passa a ser a melhor atual usada por `--compare-to`. A
+configuração escolhida conta como a primeira do novo orçamento.
+
 ## Travas do agente
 
 Abra o agente sempre por este script, depois do `bootstrap.sh`:
@@ -137,8 +157,9 @@ As regras estão em `tools/trava_agente.py`:
   pelos testes. O lote real só passa pelo orçamento: até `MAX_CONFIGURATIONS`
   configurações distintas, e o de 37 casos só com um rápido que disse `melhor`
   contra o baseline.
-  O registro fica em `.agente/orcamento.jsonl`; apague a pasta para começar
-  uma busca nova.
+  O registro fica em `.agente/orcamento.jsonl`; use
+  `tools/select_starting_point.py` para começar uma busca nova preservando o
+  orçamento anterior em `.agente/historico/`.
 
 Limites conhecidos: um agente decidido ainda consegue ler o código do avaliador
 pelo Python que roda a avaliação, e o filtro de comandos do hook pode ser
