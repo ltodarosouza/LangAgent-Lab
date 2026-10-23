@@ -1,0 +1,11 @@
+{
+  "description": "Five fixed DSR cases chosen from the 10-case quick set to cover the 37-case distribution of real-image GLCM, Wavelet and NEx metrics. Greedy facility-location selection over rank-normalized real metrics.",
+  "case_count": 5,
+  "cases": [
+    "1.000000-P4P117S305I00003 Gated 0.0A-96421-1-46",
+    "1.000000-P4P117S300I00008 Gated 50.0A-92363-1-59",
+    "1.000000-P4P105S300I00011 Gated 70.0A-12662-1-031",
+    "1.000000-P4P117S300I00005 Gated 20.0A-79282-1-36",
+    "1.000000-P4P117S302I00009 Gated 60.0A-40067-1-047"
+  ]
+}

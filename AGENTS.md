@@ -25,13 +25,17 @@ This repository is the writable laboratory. The sibling repository
 ## Real optimization
 
 - Follow `AGENT_PROMPT.md` and treat `MAX_CONFIGURATIONS` as a hard cap.
+- Read `SEARCH_STRATEGY.md` before proposing a candidate. Every change needs a metric-based
+  causal hypothesis. Do not bisect or choose a midpoint merely because the previous value failed.
 - If `workspace/search_state.json` exists, use its fixed baseline and current best;
   do not regenerate either one. Its current-best configuration is the first configuration
   in the new budget and the next hypothesis must start from those parameters.
 - Edit only `workspace/candidate.json` during the search.
-- Promote a candidate from 10 to 37 cases only when its quick report says `melhor` against
-  the fixed baseline: the mean improvement of the 7 distance-to-original metrics is at least
-  15%, each metric capped at +50%, with no extra rejected cases or pair issues.
+- Use the cumulative 5 → 10 → 37 funnel. Promote 5 to 10, then 10 to 37, only when the
+  preceding report says `melhor` against the fixed baseline. Reuse completed cases.
+- The agent may vary `steps`, `noise_level`, `eta`, `latent_noise_scale` and
+  `conditioning_noise_scale` within `configs/real_search_space.json`. Keep sampler,
+  scale factor and seed frozen.
 - Accept a new best candidate only when the complete 37-case report clears the same rule
   against the baseline and beats the current best's mean improvement.
 - Read per-case metrics and previews; never optimize from the aggregate score alone.

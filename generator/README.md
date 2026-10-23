@@ -31,7 +31,10 @@ uv pip install --python .venv/bin/python -r generator/requirements.txt
   "outputs/generator/teste_generate.tiff"
 ```
 
-Os primeiros parâmetros seguros para o agente variar são `--steps`, `--noise-level` e `--seed`.
+Os controles de inferência expostos ao laboratório são `steps`, `noise_level`,
+`eta`, `latent_noise_scale` e `conditioning_noise_scale`. O `seed` fica fixo em
+42 para a comparação medir o efeito do parâmetro, e não outra amostra aleatória.
+`sampler=ddim` e `scale_factor=1.0` também ficam congelados.
 O `scale-factor` ficou em `1.0`, conforme o exemplo do projeto original, mas ainda precisa ser confirmado experimentalmente.
 
 ## Gerar e avaliar automaticamente

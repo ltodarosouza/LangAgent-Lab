@@ -11,6 +11,13 @@ from prepare_dsr_dataset import CALIBRATION, prepare  # noqa: E402
 
 
 class PrepareDsrDatasetTest(unittest.TestCase):
+    def test_screen_is_a_fixed_five_case_subset_of_quick(self):
+        screen = json.loads((ROOT / "configs" / "screen_cases.json").read_text(encoding="utf-8"))["cases"]
+        quick = json.loads((ROOT / "configs" / "quick_cases.json").read_text(encoding="utf-8"))["cases"]
+        self.assertEqual(len(screen), 5)
+        self.assertEqual(len(set(screen)), 5)
+        self.assertTrue(set(screen).issubset(quick))
+
     def test_cases_come_from_calibration_originals(self):
         with tempfile.TemporaryDirectory() as tmp:
             evaluator, target = Path(tmp) / "evaluator", Path(tmp) / "target"

@@ -1,4 +1,4 @@
-"""Gera e avalia o lote rápido de 10 cortes ou o conjunto completo de 37."""
+"""Gera e avalia a triagem de 5, o lote rápido de 10 ou o conjunto de 37 cortes."""
 from __future__ import annotations
 
 import argparse
@@ -26,6 +26,7 @@ from settings import EVALUATOR_HISTORY, EVALUATOR_PYTHON, EVALUATOR_REPO, ensure
 
 DATASET = ROOT / "data" / "dsr-valid" / "manifest.json"
 QUICK_CASES = ROOT / "configs" / "quick_cases.json"
+SCREEN_CASES = ROOT / "configs" / "screen_cases.json"
 REAL_SEARCH_SPACE = ROOT / "configs" / "real_search_space.json"
 
 
@@ -35,11 +36,12 @@ def selected_cases(scope: str) -> list[dict]:
     if scope == "full":
         selected = list(cases.values())
     else:
-        quick = load_json(QUICK_CASES)["cases"]
-        missing = [case_id for case_id in quick if case_id not in cases]
+        selection_file = SCREEN_CASES if scope == "screen" else QUICK_CASES
+        selected_ids = load_json(selection_file)["cases"]
+        missing = [case_id for case_id in selected_ids if case_id not in cases]
         if missing:
-            raise ValueError(f"casos rápidos ausentes do manifesto: {missing}")
-        selected = [cases[case_id] for case_id in quick]
+            raise ValueError(f"casos de {scope} ausentes do manifesto: {missing}")
+        selected = [cases[case_id] for case_id in selected_ids]
     return selected
 
 
@@ -66,7 +68,7 @@ def reused_records(path: Path | None, candidate: dict) -> dict[str, dict]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--scope", choices=("quick", "full"), required=True)
+    parser.add_argument("--scope", choices=("screen", "quick", "full"), required=True)
     parser.add_argument("--config", type=Path, default=ROOT / "workspace" / "candidate.json")
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--baseline", type=Path, help="relatório do baseline do mesmo escopo; régua fixa da comparação")
@@ -115,6 +117,9 @@ def main() -> None:
             noise_level=int(candidate["noise_level"]),
             scale_factor=float(candidate["scale_factor"]),
             seed=int(candidate["seed"]),
+            eta=float(candidate["eta"]),
+            latent_noise_scale=float(candidate["latent_noise_scale"]),
+            conditioning_noise_scale=float(candidate["conditioning_noise_scale"]),
         )
         subprocess.run([
             str(EVALUATOR_PYTHON), "-m", "frameworks.texture_evaluator.evaluate_one",

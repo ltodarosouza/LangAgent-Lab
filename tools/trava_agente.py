@@ -14,8 +14,8 @@ continuam livres. Três camadas, porque uma regra escrita sozinha não basta:
      e o `CADERNO.md` só cresce: entradas antigas não são apagadas nem reescritas;
    - nada de ler o avaliador pelas ferramentas Read/Grep/Glob;
    - Python só pelos comandos aprovados, e o lote real só passa pelo
-     orçamento: no máximo `--max` configurações distintas, e o lote de 37
-     casos só depois de um rápido que disse "melhor" contra o baseline. O
+     orçamento: no máximo `--max` configurações distintas, usando o funil
+     cumulativo 5 → 10 → 37 e avançando só depois de `melhor`. O
      livro-caixa fica em `.agente/orcamento.jsonl`, que o agente não consegue
      escrever.
 
@@ -49,6 +49,7 @@ PROTECTED = (
     "agent", "generator", "configs", "tests", "tools", "models", "data",
     ".agente", ".claude", ".cursor", ".git",
     "AGENTS.md", "AGENT_PROMPT.md", "README.md", ".gitignore", ".gitattributes",
+    "SEARCH_STRATEGY.md",
     "workspace/search_state.json",
     "literatura/README.md", "literatura/artigos",
 )
@@ -196,17 +197,17 @@ class Guard:
                 current = report_path.resolve()
         return current
 
-    def compared_to_baseline(self, comparison: dict, baseline_key: str) -> bool:
-        """O rápido foi medido contra o baseline, a primeira configuração do orçamento?"""
+    def compared_to_baseline(self, comparison: dict, baseline_key: str, scope: str) -> bool:
+        """A etapa anterior foi medida contra o baseline da primeira configuração?"""
         path = comparison.get("baseline")
         if not path or not Path(path).is_file():
             return False
         report = json.loads(Path(path).read_text(encoding="utf-8"))
-        return report.get("scope") == "quick" and json.dumps(report.get("candidate"), sort_keys=True) == baseline_key
+        return report.get("scope") == scope and json.dumps(report.get("candidate"), sort_keys=True) == baseline_key
 
     def check_budget(self, args: list, cwd: Optional[str]) -> Optional[str]:
         parser = argparse.ArgumentParser(add_help=False, exit_on_error=False)
-        parser.add_argument("--scope", choices=("quick", "full"), required=True)
+        parser.add_argument("--scope", choices=("screen", "quick", "full"), required=True)
         parser.add_argument("--config", default="workspace/candidate.json")
         parser.add_argument("--output-dir", required=True)
         parser.add_argument("--reuse-report")
@@ -241,31 +242,34 @@ class Guard:
             if not parsed.baseline or self.resolve(parsed.baseline, cwd) != expected_baseline:
                 return f"use --baseline {expected_baseline.relative_to(self.root)}: a régua fixa não muda com o ponto de partida"
 
-        if parsed.scope == "full":
+        if parsed.scope in {"quick", "full"}:
+            previous_scope = "screen" if parsed.scope == "quick" else "quick"
+            previous_label = "triagem de 5 casos" if previous_scope == "screen" else "lote rápido de 10 casos"
             if not parsed.reuse_report:
-                return "o lote de 37 casos só roda com --reuse-report apontando para o rápido desta configuração"
+                return f"o lote {parsed.scope} só roda com --reuse-report apontando para a {previous_label} desta configuração"
             report_path = self.resolve(parsed.reuse_report, cwd)
             if not report_path.is_file():
-                return f"relatório rápido não encontrado: {parsed.reuse_report}"
+                return f"relatório da etapa anterior não encontrado: {parsed.reuse_report}"
             report = json.loads(report_path.read_text(encoding="utf-8"))
-            if report.get("scope") != "quick" or report.get("candidate") != candidate or not report.get("completed"):
-                return "--reuse-report precisa ser o lote rápido completo desta mesma configuração"
+            if report.get("scope") != previous_scope or report.get("candidate") != candidate or not report.get("completed"):
+                return f"--reuse-report precisa ser a {previous_label} completa desta mesma configuração"
             comparison = report.get("comparison")
-            earlier_full = {entry["candidate_key"] for entry in entries if entry["scope"] == "full"}
+            earlier_stage = {entry["candidate_key"] for entry in entries if entry["scope"] == parsed.scope}
             if comparison is None:
-                if earlier_full - {key}:
-                    return "só o baseline sobe para 37 casos sem comparação; compare o rápido com --baseline"
+                if earlier_stage - {key}:
+                    return f"só o baseline avança para {parsed.scope} sem comparação; compare a etapa anterior com --baseline"
             elif comparison.get("verdict") != "melhor":
-                return f"o lote rápido disse '{comparison.get('verdict')}'; só 'melhor' sobe para 37 casos"
+                return f"a {previous_label} disse '{comparison.get('verdict')}'; só 'melhor' avança"
             elif state:
-                baseline_quick = self.state_report(state, "baseline", "quick")
-                if self.resolve(comparison.get("baseline", ""), cwd) != baseline_quick:
-                    return "o lote rápido precisa usar o baseline rápido fixado em workspace/search_state.json"
-                expected_best = self.expected_best_full(state, entries)
-                if not parsed.compare_to or self.resolve(parsed.compare_to, cwd) != expected_best:
-                    return f"use --compare-to {expected_best.relative_to(self.root)}: essa é a melhor completa atual"
-            elif entries and not self.compared_to_baseline(comparison, entries[0]["candidate_key"]):
-                return "o lote rápido precisa ter sido comparado com --baseline apontando para o rápido do baseline"
+                baseline_previous = self.state_report(state, "baseline", previous_scope)
+                if self.resolve(comparison.get("baseline", ""), cwd) != baseline_previous:
+                    return f"a {previous_label} precisa usar o baseline fixado em workspace/search_state.json"
+                if parsed.scope == "full":
+                    expected_best = self.expected_best_full(state, entries)
+                    if not parsed.compare_to or self.resolve(parsed.compare_to, cwd) != expected_best:
+                        return f"use --compare-to {expected_best.relative_to(self.root)}: essa é a melhor completa atual"
+            elif entries and not self.compared_to_baseline(comparison, entries[0]["candidate_key"], previous_scope):
+                return f"a {previous_label} precisa ter sido comparada com o baseline da mesma etapa"
 
         self.ledger.parent.mkdir(parents=True, exist_ok=True)
         with self.ledger.open("a", encoding="utf-8") as handle:

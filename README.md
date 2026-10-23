@@ -73,8 +73,10 @@ duplicadas e não são enviadas ao GitHub.
 
 ## Avaliação real em lote
 
-O lote rápido usa sempre os mesmos 10 cortes. O lote completo usa os 37 cortes
-válidos. Cada execução salva `report.json` com todas as métricas de todas as
+A busca usa um funil cumulativo: 5 cortes fixos de triagem, depois 10 cortes e,
+somente após duas confirmações de melhora, os 37 válidos. Cada etapa reutiliza
+as imagens da anterior, portanto uma configuração promovida gera 5 + 5 + 27,
+sem repetir trabalho. Cada execução salva `report.json` com todas as métricas de todas as
 imagens, `report.md` com o resumo e prévias visuais dos pares, e `boletim.json`,
 a nota do avaliador na régua congelada `juiz-v1` (formato em
 `docs/contracts/boletim.md` do avaliador). Com `--compare-to`, o boletim também
@@ -87,8 +89,14 @@ refazer o boletim de um lote já gerado:
 
 ```bash
 .venv/bin/python generator/run_batch.py \
+  --scope screen \
+  --config workspace/candidate.json \
+  --output-dir runs/real/baseline-screen
+
+.venv/bin/python generator/run_batch.py \
   --scope quick \
   --config workspace/candidate.json \
+  --reuse-report runs/real/baseline-screen/report.json \
   --output-dir runs/real/baseline-quick
 
 .venv/bin/python generator/run_batch.py \
@@ -98,8 +106,9 @@ refazer o boletim de um lote já gerado:
   --output-dir runs/real/baseline-full
 ```
 
-Para comparar uma nova tentativa, acrescente `--baseline` apontando para o
-relatório do baseline do mesmo tamanho; no lote completo, acrescente também
+Para comparar uma nova tentativa, comece em `--scope screen` e acrescente
+`--baseline` apontando para o relatório do baseline do mesmo tamanho. Só avance
+quando o relatório disser `melhor`; no lote completo, acrescente também
 `--compare-to` com o melhor relatório completo atual. A régua é a mesma nos dois
 tamanhos: para cada distância até a original (`glcm_contrast_z`,
 `glcm_energy_z`, `wavelet_fine_z`, `wavelet_coarse_z`, `wavelet_entropy_z`,
@@ -112,6 +121,10 @@ também deve ler todas as métricas por imagem.
 
 O prompt pronto para entregar a qualquer agente está em `AGENT_PROMPT.md`. O
 campo `MAX_CONFIGURATIONS` controla quantas configurações ele pode testar.
+O raciocínio esperado para escolher parâmetros está em `SEARCH_STRATEGY.md`.
+Além de `steps` e `noise_level`, a busca pode controlar `eta`,
+`latent_noise_scale` e `conditioning_noise_scale`; sampler, seed e scale factor
+continuam congelados para manter comparações válidas.
 
 ### Rodar com o Codex
 
@@ -138,11 +151,12 @@ o agente, rode como humano:
 ```
 
 O comando encontra o lote rápido correspondente, valida os mesmos casos,
-atualiza `workspace/candidate.json`, cria o estado local
+encontra também a triagem de 5 e o lote rápido correspondentes, atualiza
+`workspace/candidate.json`, cria o estado local
 `workspace/search_state.json` e arquiva o orçamento anterior. Ele não gera
 imagens. Sem `--from-run`, o mesmo comando apenas mostra a seleção atual.
 
-A partir daí, o baseline continua fixo em `baseline-quick/full`, enquanto o
+A partir daí, o baseline continua fixo em `baseline-screen/quick/full`, enquanto o
 relatório escolhido passa a ser a melhor atual usada por `--compare-to`. A
 configuração escolhida conta como a primeira do novo orçamento.
 
@@ -169,8 +183,8 @@ As regras estão em `tools/trava_agente.py`:
   `literatura/notas/` e `CADERNO.md`, que só aceita acréscimos;
   avaliador fora do alcance; Python só por `generator/run_batch.py`, pelo mock e
   pelos testes. O lote real só passa pelo orçamento: até `MAX_CONFIGURATIONS`
-  configurações distintas, e o de 37 casos só com um rápido que disse `melhor`
-  contra o baseline.
+  configurações distintas, seguindo obrigatoriamente o funil 5 → 10 → 37 e
+  avançando apenas após `melhor` contra o baseline.
   O registro fica em `.agente/orcamento.jsonl`; use
   `tools/select_starting_point.py` para começar uma busca nova preservando o
   orçamento anterior em `.agente/historico/`.

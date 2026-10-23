@@ -36,6 +36,9 @@ def generate_image(
     noise_level: int,
     scale_factor: float,
     seed: int,
+    eta: float = 0.0,
+    latent_noise_scale: float = 1.0,
+    conditioning_noise_scale: float = 1.0,
 ) -> dict:
     """Gera uma TIFF reutilizando modelos já carregados e devolve os metadados."""
     latent_size = tuple(int(value) for value in config.inference.latent_size)
@@ -50,7 +53,9 @@ def generate_image(
     low_res = F.interpolate(low_res, size=latent_size, mode="bilinear", align_corners=False).to(device)
     generator = torch.Generator(device="cpu").manual_seed(seed)
     latents = torch.randn((1, int(config.ldm.out_channels), *latent_size), generator=generator).to(device)
+    latents = latents * latent_noise_scale
     low_res_noise = torch.randn((1, 1, *latent_size), generator=generator).to(device)
+    low_res_noise = low_res_noise * conditioning_noise_scale
     noise_tensor = torch.tensor([noise_level], dtype=torch.long, device=device)
 
     scheduler = DDIMScheduler(
@@ -74,7 +79,9 @@ def generate_image(
                 timesteps=timestep_tensor,
                 class_labels=noise_tensor,
             )
-            latents, _ = scheduler.step(predicted_noise, timestep_value, latents)
+            latents, _ = scheduler.step(
+                predicted_noise, timestep_value, latents, eta=eta, generator=generator,
+            )
         generated = stage1.decode_stage_2_outputs(latents / scale_factor)
 
     result = generated[0, 0].detach().float().cpu().numpy().astype(np.float32)
@@ -84,7 +91,15 @@ def generate_image(
         "input": str(source_path.resolve()),
         "output": str(output_path.resolve()),
         "device": str(device),
-        "parameters": {"steps": steps, "noise_level": noise_level, "scale_factor": scale_factor, "seed": seed},
+        "parameters": {
+            "steps": steps,
+            "noise_level": noise_level,
+            "scale_factor": scale_factor,
+            "seed": seed,
+            "eta": eta,
+            "latent_noise_scale": latent_noise_scale,
+            "conditioning_noise_scale": conditioning_noise_scale,
+        },
         "elapsed_seconds": round(time.perf_counter() - started, 3),
         "input_stats": array_stats(source),
         "output_stats": array_stats(result),
@@ -105,6 +120,9 @@ def main() -> None:
     parser.add_argument("--noise-level", type=int)
     parser.add_argument("--scale-factor", type=float)
     parser.add_argument("--seed", type=int)
+    parser.add_argument("--eta", type=float)
+    parser.add_argument("--latent-noise-scale", type=float)
+    parser.add_argument("--conditioning-noise-scale", type=float)
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
     parser.add_argument("--aekl", type=Path, default=DEFAULT_AEKL)
     parser.add_argument("--ldm", type=Path, default=DEFAULT_LDM)
@@ -117,9 +135,16 @@ def main() -> None:
     noise_level = args.noise_level if args.noise_level is not None else int(inference.noise_level)
     scale_factor = args.scale_factor if args.scale_factor is not None else float(inference.scale_factor)
     seed = args.seed if args.seed is not None else int(inference.seed)
+    eta = args.eta if args.eta is not None else float(inference.get("eta", 0.0))
+    latent_noise_scale = (args.latent_noise_scale if args.latent_noise_scale is not None
+                          else float(inference.get("latent_noise_scale", 1.0)))
+    conditioning_noise_scale = (args.conditioning_noise_scale if args.conditioning_noise_scale is not None
+                                 else float(inference.get("conditioning_noise_scale", 1.0)))
     generate_image(
         args.input, args.output, stage1, diffusion, config, device,
         steps=steps, noise_level=noise_level, scale_factor=scale_factor, seed=seed,
+        eta=eta, latent_noise_scale=latent_noise_scale,
+        conditioning_noise_scale=conditioning_noise_scale,
     )
     metadata_path = args.output.with_suffix(args.output.suffix + ".json")
     print(f"Imagem salva em: {args.output}")

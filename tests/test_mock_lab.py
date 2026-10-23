@@ -29,6 +29,12 @@ class MockLabTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_candidate(candidate)
 
+    def test_new_sampling_controls_are_bounded(self):
+        candidate = load_json(ROOT / "configs" / "baseline.json")
+        candidate["eta"] = 1.1
+        with self.assertRaises(ValueError):
+            validate_candidate(candidate)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -21,6 +21,7 @@ STATE = ROOT / "workspace" / "search_state.json"
 CANDIDATE = ROOT / "workspace" / "candidate.json"
 LEDGER = ROOT / ".agente" / "orcamento.jsonl"
 DEFAULT_BASELINE_QUICK = RUNS / "baseline-quick" / "report.json"
+DEFAULT_BASELINE_SCREEN = RUNS / "baseline-screen" / "report.json"
 DEFAULT_BASELINE_FULL = RUNS / "baseline-full" / "report.json"
 
 
@@ -54,9 +55,9 @@ def case_ids(report: dict) -> list[str]:
     return sorted(case["case_id"] for case in report.get("cases", []))
 
 
-def matching_quick(full_path: Path, candidate: dict) -> Path:
+def matching_stage(full_path: Path, candidate: dict, scope: str) -> Path:
     name = full_path.parent.name
-    direct = full_path.parent.with_name(name[:-5] + "-quick") / "report.json" if name.endswith("-full") else None
+    direct = full_path.parent.with_name(name[:-5] + f"-{scope}") / "report.json" if name.endswith("-full") else None
     candidates = ([direct] if direct else []) + sorted(RUNS.glob("*/report.json"))
     seen: set[Path] = set()
     for path in candidates:
@@ -67,9 +68,9 @@ def matching_quick(full_path: Path, candidate: dict) -> Path:
             report = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             continue
-        if report.get("scope") == "quick" and report.get("completed") and report.get("candidate") == candidate:
+        if report.get("scope") == scope and report.get("completed") and report.get("candidate") == candidate:
             return path.resolve()
-    raise ValueError("não encontrei um lote rápido completo com os mesmos parâmetros")
+    raise ValueError(f"não encontrei um lote {scope} completo com os mesmos parâmetros")
 
 
 def archive_ledger() -> Path | None:
@@ -87,18 +88,24 @@ def archive_ledger() -> Path | None:
     return destination
 
 
-def select_starting_point(from_run: Path, baseline_quick: Path, baseline_full: Path) -> dict:
+def select_starting_point(from_run: Path, baseline_screen: Path, baseline_quick: Path, baseline_full: Path) -> dict:
     full_path = report_path(from_run)
     full = load_report(full_path, "full")
-    quick_path = matching_quick(full_path, full["candidate"])
+    screen_path = matching_stage(full_path, full["candidate"], "screen")
+    quick_path = matching_stage(full_path, full["candidate"], "quick")
+    screen = load_report(screen_path, "screen")
     quick = load_report(quick_path, "quick")
+    baseline_screen_path = report_path(baseline_screen)
     baseline_quick_path = report_path(baseline_quick)
     baseline_full_path = report_path(baseline_full)
+    baseline_s = load_report(baseline_screen_path, "screen")
     baseline_q = load_report(baseline_quick_path, "quick")
     baseline_f = load_report(baseline_full_path, "full")
 
-    if quick["candidate"] != full["candidate"]:
-        raise ValueError("os lotes rápido e completo do ponto de partida usam parâmetros diferentes")
+    if screen["candidate"] != full["candidate"] or quick["candidate"] != full["candidate"]:
+        raise ValueError("os três lotes do ponto de partida usam parâmetros diferentes")
+    if case_ids(screen) != case_ids(baseline_s):
+        raise ValueError("a triagem escolhida não usa os mesmos casos do baseline de triagem")
     if case_ids(quick) != case_ids(baseline_q):
         raise ValueError("o rápido escolhido não usa os mesmos casos do baseline rápido")
     if case_ids(full) != case_ids(baseline_f):
@@ -108,10 +115,12 @@ def select_starting_point(from_run: Path, baseline_quick: Path, baseline_full: P
         "schema_version": 1,
         "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "baseline": {
+            "screen": relative(baseline_screen_path),
             "quick": relative(baseline_quick_path),
             "full": relative(baseline_full_path),
         },
         "current_best": {
+            "screen": relative(screen_path),
             "quick": relative(quick_path),
             "full": relative(full_path),
             "candidate": full["candidate"],
@@ -134,10 +143,11 @@ def show_state() -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--from-run", type=Path, help="pasta ou report.json do melhor lote completo")
+    parser.add_argument("--baseline-screen", type=Path, default=DEFAULT_BASELINE_SCREEN)
     parser.add_argument("--baseline-quick", type=Path, default=DEFAULT_BASELINE_QUICK)
     parser.add_argument("--baseline-full", type=Path, default=DEFAULT_BASELINE_FULL)
     args = parser.parse_args()
-    state = (select_starting_point(args.from_run, args.baseline_quick, args.baseline_full)
+    state = (select_starting_point(args.from_run, args.baseline_screen, args.baseline_quick, args.baseline_full)
              if args.from_run else show_state())
     print(json.dumps(state, indent=2, ensure_ascii=False))
     print("\nPróximo passo: MAX_CONFIGURATIONS=10 ./tools/agente.sh")

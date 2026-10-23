@@ -32,3 +32,6 @@ inference:
   noise_level: 1
   num_inference_steps: 25
   seed: 42
+  eta: 0.0
+  latent_noise_scale: 1.0
+  conditioning_noise_scale: 1.0

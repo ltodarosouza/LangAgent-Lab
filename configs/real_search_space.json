@@ -20,5 +20,20 @@
   "seed": {
     "type": "integer",
     "choices": [42]
+  },
+  "eta": {
+    "type": "number",
+    "min": 0.0,
+    "max": 1.0
+  },
+  "latent_noise_scale": {
+    "type": "number",
+    "min": 0.75,
+    "max": 1.25
+  },
+  "conditioning_noise_scale": {
+    "type": "number",
+    "min": 0.5,
+    "max": 1.5
   }
 }
