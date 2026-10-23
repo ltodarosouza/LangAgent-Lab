@@ -14,11 +14,14 @@ Antes de começar, leia `AGENTS.md`, `README.md`,
 `configs/real_search_space.json`, `workspace/candidate.json` e, se existir,
 `workspace/search_state.json`.
 
-O ambiente já foi preparado por um humano com `./tools/bootstrap.sh`, e esta
-sessão roda com as travas de `tools/agente.sh`: você só escreve em
-`workspace/candidate.json` e `runs/`, não tem acesso ao avaliador e o lote real
-passa por um controle de orçamento. Se algo faltar ou uma trava impedir um passo
-legítimo, pare e reporte o bloqueio; não tente contorná-la.
+O ambiente já foi preparado por um humano com `./tools/bootstrap.sh`. Respeite
+as fronteiras de `AGENTS.md`: durante a busca, escreva somente em
+`workspace/candidate.json`, `runs/`, `literatura/notas/` e, por acréscimo, em
+`CADERNO.md`. Não altere nem use o avaliador como fonte de respostas. Quando a
+sessão tiver sido aberta por `tools/agente.sh`, essas regras também estarão
+protegidas por travas técnicas e controle automático de orçamento. Se algo
+faltar ou uma trava impedir um passo legítimo, pare e reporte o bloqueio; não
+tente contorná-la.
 
 Regras:
 

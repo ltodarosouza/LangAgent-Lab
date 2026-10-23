@@ -113,6 +113,19 @@ também deve ler todas as métricas por imagem.
 O prompt pronto para entregar a qualquer agente está em `AGENT_PROMPT.md`. O
 campo `MAX_CONFIGURATIONS` controla quantas configurações ele pode testar.
 
+### Rodar com o Codex
+
+1. Abra a pasta `lung-agent-lab` no Codex.
+2. Crie uma conversa nova nessa pasta.
+3. Abra `AGENT_PROMPT.md`, copie todo o texto entre as linhas `---` e cole na
+   conversa.
+4. Se quiser, altere apenas `MAX_CONFIGURATIONS` antes de enviar.
+5. Envie o prompt. O Codex lerá `AGENTS.md`, o estado da busca e começará pela
+   próxima hipótese, sem refazer o baseline nem a melhor versão atual.
+
+Não execute `tools/agente.sh` para usar o Codex: esse script abre o Claude Code.
+No Codex, basta abrir a pasta correta e enviar o prompt completo.
+
 ### Continuar a partir do melhor resultado já encontrado
 
 O baseline continua sendo a régua fixa, mas uma nova busca pode começar dos
@@ -133,9 +146,10 @@ A partir daí, o baseline continua fixo em `baseline-quick/full`, enquanto o
 relatório escolhido passa a ser a melhor atual usada por `--compare-to`. A
 configuração escolhida conta como a primeira do novo orçamento.
 
-## Travas do agente
+## Travas do agente no Claude Code
 
-Abra o agente sempre por este script, depois do `bootstrap.sh`:
+Para usar o Claude Code com as travas técnicas, abra-o por este script depois do
+`bootstrap.sh`:
 
 ```bash
 MAX_CONFIGURATIONS=10 ./tools/agente.sh
