@@ -572,3 +572,499 @@ seguro; nenhum ataca o brilho escuro nem a energia GLCM alta. `sampler`, `scale_
 **Decisão.** Descartada. Encerro a busca (regra 7: sem hipótese segura restante com ganho
 defensável). Nenhuma configuração chegou a `melhor` no quick, então nenhuma foi para 37 casos.
 Melhor = baseline (`steps` 25, `noise_level` 1); `workspace/candidate.json` restaurado a ele.
+
+## 019 · inventário e plano da busca de 10 configurações · 2026-10-23
+
+- Configuração 1/10: o ponto de partida de `workspace/search_state.json`, isto é, o baseline
+  local (`steps` 25, `noise_level` 1, `eta` 0, escalas 1,0). Já medido em
+  `runs/real/baseline-screen`, `baseline-quick` e `baseline-full`; não será regenerado.
+- Inventário local em `runs/real/`: baseline-screen/quick/full (completos), e só no escopo
+  quick (10 casos): `candidate-01-quick` (noise_level 50, 016), `candidate-02-quick`
+  (noise_level 10, 017) e `candidate-03-quick` (steps 50, 018). Nenhum deles foi `melhor`.
+  As entradas 003 a 012 (steps 35, conditioning 1,10, eta 0,10/0,20/0,25) vieram de outra
+  máquina: são pistas, não relatórios reutilizáveis aqui. Ficam sem medição local: `eta`,
+  `latent_noise_scale`, `conditioning_noise_scale` e `steps` 35.
+
+**O que está ruim.** No baseline local a textura é lisa: energia GLCM mediana 178% da
+original (Δ +0,60 a +0,78 IQR), contraste GLCM ~76–79%, Wavelet fina ~80% e entropia
+−0,69 IQR; na triagem, 15–25% da área aparece como "perdeu contraste". O brilho está
+quase resolvido e os pares são todos `ok`. `noise_level` (10 e 50) e `steps` (50) já foram
+medidos aqui: não moveram as distâncias de forma consistente e `noise_level` 50 produziu
+ruído fino e perda de anatomia.
+
+**Parâmetro provável.** `eta`. Com `eta=0` o DDIM é determinístico e cada previsão de x0
+tende à média condicional, o que alisa. A entrada 008-010 (outra máquina, com steps 35)
+viu as sete distâncias melhorarem de forma quase monotônica de 0 a 0,25, com ganhos
+maiores em energia GLCM, entropia e LL; contraste, Wavelet fina e NEx generalizaram pior.
+É uma pista a confirmar localmente, não evidência.
+
+**Mudança 2/10.** Só `eta`: 0,00 → 0,20, partindo do baseline (steps 25). Escolho 0,20 e
+não 0,25 porque a pista mostrou o NEx alto individual (`...S302...1-047`) reaparecendo a
+partir de 0,20 e o ganho em 0,25 não se sustentou nos 10 casos; 0,20 já captura a maior
+parte do ganho de energia/entropia com menos risco de ruído espúrio.
+
+**Resposta esperada.** Menores módulos de energia GLCM, entropia Wavelet e LL (direção
+para zero), mais área de textura preservada; contraste GLCM e Wavelet fina devem subir
+um pouco. NEx, brilho, densidade e correlação do par/mapa não podem piorar, e não pode
+haver rejeição nem par inválido novo. Se Wavelet fina ou NEx passarem de 100% ou a
+correlação cair, a hipótese de ganho por estocasticidade fica rejeitada.
+
+## 020 · eta-0.20 resultado (configuração 2/10) · 2026-10-23
+
+- Configuração: `workspace/candidate.json` = {"steps": 25, "noise_level": 1, "sampler": "ddim", "scale_factor": 1.0, "seed": 42, "eta": 0.2, "latent_noise_scale": 1.0, "conditioning_noise_scale": 1.0}
+- Pastas: `runs/real/candidate-04-screen`, `candidate-04-quick`, `candidate-04-full`
+  (cada uma reutilizando a anterior; `--baseline` e `--compare-to` = baseline do mesmo escopo)
+- Comparado com: baseline local (mesmos casos e semente). Hipótese e mudança: entrada 019.
+
+**Resultado.** Funil completo, `melhor` nos três estágios.
+
+| escopo | melhora média vs baseline | vitórias/derrotas | rejeições / pares novos | nota (baseline → eta 0,2) |
+|---|---|---|---|---|
+| 5 | +7,28% | 5/0 | 0 / 0 | 60,48 → 61,16 |
+| 10 | +5,28% | 8/2 | 0 / 0 | 64,53 → 68,31 |
+| 37 | +4,81% | 29/8 | 0 / 0 | 68,92 → 71,64 |
+
+Melhora por métrica nos 37 casos: contraste GLCM +3,04%, energia GLCM +5,84%, Wavelet fina
++1,80%, grossa +6,13%, entropia +4,44%, LL +6,04%, NEx +6,36%. Contagens (baseline → eta 0,2):
+textura aprovada 21 → 27, final aprovada 7 → 13, brilho aprovado 34 → 36, NEx alto 5 → 3,
+NEx ok 29 → 32, pares 37/37 ok. Nada piorou nas contagens. Meta forte de 15%: não atingida.
+
+Casos: os piores seguem sendo cortes lisos ou escuros. `...S303...1-033` (47,1), `...S300...1-59`
+(49,2, escuro, Δμ −0,35), `...S105...1-031` (52,6, fino 61%, grosso 51%), `...S305...1-65`
+(56,9) e `...S301...1-072` (57,2). `...S302...1-047` continua com ruído (fino 114%, NEx alto +0,668).
+Prévias não inspecionadas além dos números do relatório.
+
+**Lição.** A hipótese se confirmou localmente, mas o efeito é modesto: energia GLCM, Wavelet
+grossa e LL respondem mais que contraste e Wavelet fina (+1,8%), então o `eta` alivia a
+suavização global sem recuperar bem as altas frequências. O ganho caiu de 7,3% (5) para 4,8% (37):
+a triagem superestimou. Os cortes lisos (-031, -033, -36) quase não se mexeram; esse defeito
+não é de estocasticidade.
+
+**Decisão.** Nova melhor operacional (37 casos: supera o baseline, 29 vitórias contra 8 derrotas,
+sem rejeições nem pares inválidos). Melhor relatório completo: `runs/real/candidate-04-full/report.json`.
+Não alterei `workspace/search_state.json` (fora da área de escrita permitida); `candidate-04-*`
+passam a ser os caminhos de `--compare-to` nas próximas tentativas.
+
+## 021 · latent-noise-1.10 · plano da configuração 3/10 · 2026-10-23
+
+- Configuração: `workspace/candidate.json` = {"steps": 25, "noise_level": 1, "sampler": "ddim", "scale_factor": 1.0, "seed": 42, "eta": 0.2, "latent_noise_scale": 1.1, "conditioning_noise_scale": 1.0}
+- Pastas: `runs/real/candidate-05-screen` (e -quick, -full se `melhor`).
+- Comparado com: baseline (régua) e `candidate-04-*` (melhor atual, `--compare-to`).
+
+**O que está ruim.** Mesmo com `eta` 0,2, Wavelet fina (+1,8%) e contraste GLCM (+3,0%)
+mal se mexeram, e os cortes lisos (-031 fino 61%/grosso 51%, -033 ~48%, -36 ~71%) seguem
+com contraste baixo. O defeito dominante é contraste e detalhe fino baixos em cortes
+específicos, não só energia alta.
+
+**Parâmetro provável.** `latent_noise_scale`: amplitude do ruído latente inicial. Com
+amplitude maior a trajetória parte de mais variância, o que pode aumentar contraste e
+diversidade global (SEARCH_STRATEGY). É o único controle livre ainda sem nenhuma medição.
+Descarto `conditioning_noise_scale` agora porque a pista (entrada 007) mostrou NEx
+bidirecional pior; `noise_level` e `steps` já foram medidos aqui sem efeito consistente.
+
+**Mudança.** Só `latent_noise_scale`: 1,00 → 1,10, a partir da melhor atual (eta 0,2).
+Passo pequeno porque o risco declarado é perder fidelidade ao par.
+
+**Resposta esperada.** Contraste GLCM e Wavelet fina sobem (distâncias menores), nos cortes
+lisos em especial. Correlação do par/mapa, brilho, densidade e NEx não podem piorar. Se a
+correlação cair ou surgirem Wavelet fina >100% / NEx alto novos, a hipótese será rejeitada.
+
+## 022 · latent-noise-1.10 resultado (configuração 3/10) · 2026-10-23
+
+- Pasta: `runs/real/candidate-05-screen` (5 casos). Plano e hipótese: entrada 021.
+
+**Resultado.** Veredito `pior`, relatório inválido para comparação: 5 rejeições, 5 pares
+suspeitos, nota 0,00 (contra 61,16 da melhor atual e 60,48 do baseline). Correlação do par
+0,10 com a original; textura reprovada nos 5 cortes com ruído extremo (fino ~1982%, grosso
+~1334%, contraste GLCM ~1934%); NEx alto em 4 de 5 (Δ até +0,756); um corte com densidade
+escura demais. Em Δ/IQR, contraste e Wavelets foram a +11 a +13, enquanto energia (−0,82) e
+entropia (−0,03) foram para perto de zero, o que mostra imagem dominada por ruído, não textura.
+As prévias não foram inspecionadas, pois o relatório já é inequívoco.
+
+**Lição.** Hipótese refutada com força: aumentar 10% a amplitude do ruído latente inicial
+não dá diversidade fina, rompe o par. O gerador usa `scale_factor=1,0` congelado, então o
+latente inicial fora da escala aprendida parece sair do domínio do modelo. O efeito é
+desproporcional (10% do parâmetro, ordem de grandeza na textura), logo não faz sentido
+testar valores intermediários nem >1. O sentido <1 suavizaria ainda mais, contra o defeito
+dominante (textura lisa); não será testado agora.
+
+**Decisão.** Descartada, não promovida. Melhor atual continua `candidate-04-full` (eta 0,2).
+`workspace/candidate.json` será restaurado à melhor antes da próxima tentativa.
+
+## 023 · conditioning-1.10 · plano da configuração 4/10 · 2026-10-23
+
+- Configuração: `workspace/candidate.json` = {"steps": 25, "noise_level": 1, "sampler": "ddim", "scale_factor": 1.0, "seed": 42, "eta": 0.2, "latent_noise_scale": 1.0, "conditioning_noise_scale": 1.1}
+- Pastas: `runs/real/candidate-06-screen` (e -quick, -full se `melhor`).
+- Comparado com: baseline (régua) e `candidate-04-*` (melhor atual, `--compare-to`).
+
+**O que está ruim.** Contraste GLCM (+3,0%) e Wavelet fina (+1,8%) são as métricas que
+menos responderam ao `eta`; os cortes lisos (-031, -033, -36) mantêm contraste e detalhe
+fino baixos. Brilho e pares estão bem (36/37 e 37/37).
+
+**Parâmetro provável.** `conditioning_noise_scale`: amplitude da corrupção da imagem que
+condiciona o modelo. Com mais corrupção o modelo copia menos a entrada suave e recorre ao
+prior para reconstruir textura. Pista (outra máquina, entrada 007, eta 0): +10% no controle
+moveu contraste, fino e energia na direção certa em todos, mas aumentou os extremos de NEx
+(NEx caiu de +0,9% para −3,3% de melhora). Aqui NEx já tem folga (+6,4% com eta 0,2), e o
+passo é pequeno porque a tentativa anterior mostrou que o gerador é sensível a amplitudes de ruído.
+
+**Mudança.** Só `conditioning_noise_scale`: 1,00 → 1,10, a partir da melhor atual.
+
+**Resposta esperada.** Contraste GLCM e Wavelet fina com distância menor, nos cortes lisos
+em especial. NEx alto/baixo, correlação do par/mapa, brilho e densidade não podem piorar. Se
+surgir rejeição, par suspeito ou Wavelet fina >100% novos, a hipótese será rejeitada
+e não se sobe mais esse controle.
+
+## 024 · conditioning-1.10 resultado (configuração 4/10) · 2026-10-23
+
+- Pastas: `runs/real/candidate-06-screen`, `candidate-06-quick`, `candidate-06-full`.
+- `--baseline` = baseline do escopo; `--compare-to` = `candidate-04-*` do escopo. Plano: entrada 023.
+
+| escopo | melhora vs baseline (06) | melhora da melhor atual (04) | vitórias/derrotas | rejeições / pares novos |
+|---|---|---|---|---|
+| 5 | +7,80% | +7,28% | 3/2 | 0 / 0 |
+| 10 | +6,38% | +5,28% | 8/2 | 0 / 0 |
+| 37 | +6,01% | +4,81% | 33/4 | 0 / 0 |
+
+Nos 37 casos, melhora por métrica (eta 0,2 → eta 0,2 + conditioning 1,1): contraste GLCM
++3,04% → +4,63%, energia GLCM +5,84% → +8,20%, Wavelet fina +1,80% → +3,27%, grossa +6,13% →
++8,08%, entropia +4,44% → +7,51%, LL +6,04% → +6,05%, NEx +6,36% → +4,36%. Contagens
+inalteradas: textura aprovada 27, final aprovada 13, brilho aprovado 36, NEx 32 ok / 3 altos /
+2 inconclusivos, pares 37/37 ok. Nota 71,64 → 72,04. Meta forte de 15%: não atingida.
+
+Casos: os cinco piores são os mesmos de antes com notas quase iguais (`...1-033` 47,3,
+`...1-59` 49,4 escuro, `...1-031` 53,0, `...1-65` 57,1, `...1-072` 57,4). O ganho está
+espalhado (33 vitórias), não concentrado em poucos cortes; os lisos continuam lisos.
+Prévias não inspecionadas.
+
+**Lição.** Hipótese confirmada em 6 das 7 métricas, com contraste e Wavelet fina subindo
+cerca de 1,5 p.p. cada. A exceção foi NEx (−2,0 p.p.), como a pista já previa, mas sem criar
+NEx alto novo. O efeito é pequeno e não sobe os cortes lisos, que parecem limitados por
+outra coisa. Duas medidas (1,0 e 1,1) apontam a mesma direção, o que autoriza um passo a mais
+no mesmo controle; a pista de outra máquina já avisa que NEx piora com ele.
+
+**Decisão.** Nova melhor operacional (supera `candidate-04-full`, 33 vitórias contra 4, sem
+rejeições nem pares inválidos). Melhor relatório completo: `runs/real/candidate-06-full/report.json`.
+`workspace/search_state.json` não foi alterado (fora da área de escrita).
+
+## 025 · conditioning-1.25 · plano da configuração 5/10 · 2026-10-23
+
+- Configuração: `workspace/candidate.json` = {"steps": 25, "noise_level": 1, "sampler": "ddim", "scale_factor": 1.0, "seed": 42, "eta": 0.2, "latent_noise_scale": 1.0, "conditioning_noise_scale": 1.25}
+- Pastas: `runs/real/candidate-07-screen` (e -quick, -full se `melhor`).
+- Comparado com: baseline (régua) e `candidate-06-*` (melhor atual).
+
+**O que está ruim.** Contraste GLCM (+4,6%) e Wavelet fina (+3,3%) seguem como as métricas
+mais distantes da original; NEx perdeu 2 p.p. no último passo. Os cortes lisos (-033, -031)
+ainda estão ~50% do detalhe original.
+
+**Parâmetro provável.** `conditioning_noise_scale`, que acabou de mostrar efeito monotônico
+em contraste, fino, energia e entropia (1,0 → 1,1). Como cada 0,1 rendeu só ~1,5 p.p. em
+contraste/fino, um passo de 0,15 (1,10 → 1,25) é o menor que cabe medir com sinal acima do
+ruído entre escopos; não é ponto médio de nenhum intervalo falho. A tentativa em `noise_level`
+50 (016) mostra que a condição ruidosa demais quebra o par, então o teto de segurança é baixo.
+
+**Mudança.** Só `conditioning_noise_scale`: 1,10 → 1,25.
+
+**Resposta esperada.** Contraste GLCM e Wavelet fina com distância menor (+1 p.p. ou mais
+em cada), energia e entropia continuando a cair. NEx alto/baixo, correlação do par/mapa,
+brilho e densidade não podem piorar. Se a correlação do par cair, surgir par suspeito, rejeição
+ou NEx alto novo, a hipótese de monotonicidade fica refutada e o controle volta a 1,10.
+
+## 026 · conditioning-1.25 resultado (configuração 5/10) · 2026-10-23
+
+- Pastas: `runs/real/candidate-07-screen`, `candidate-07-quick`, `candidate-07-full`.
+- `--baseline` = baseline do escopo; `--compare-to` = `candidate-06-*` do escopo. Plano: entrada 025.
+
+| escopo | melhora vs baseline (07) | melhora da melhor atual (06) | vitórias/derrotas | rejeições / pares novos |
+|---|---|---|---|---|
+| 5 | +8,69% | +7,80% | 3/2 | 0 / 0 |
+| 10 | +8,11% | +6,38% | 8/2 | 0 / 0 |
+| 37 | +7,93% | +6,01% | 33/4 | 0 / 0 |
+
+Nos 37 casos, melhora por métrica (conditioning 1,10 → 1,25): contraste GLCM +4,63% → +7,16%,
+energia GLCM +8,20% → +12,02%, Wavelet fina +3,27% → +5,44%, grossa +8,08% → +11,33%,
+entropia +7,51% → +12,28%, LL +6,05% → +6,07%, NEx +4,36% → +1,21%. Nota 72,04 → 72,52.
+
+**Regressões a reportar.** Textura aprovada 27 → 26; NEx alto 3 → 4 e NEx ok 32 → 31
+(um corte a mais saiu da faixa real). Brilho 36/37, final 13 aprovadas e pares 37/37 ok
+ficaram iguais. NEx perdeu 3,15 p.p. de melhora (6,36% com eta 0,2 isolado → 4,36% em 1,10 →
+1,21% em 1,25). Os cinco piores casos seguem os mesmos (`...1-033` 47,6, `...1-59` 50,0,
+`...1-031` 53,9, `...1-65` 57,3, `...1-072` 57,9): os cortes lisos continuam lisos. Meta forte
+de 15%: não atingida. Prévias não inspecionadas.
+
+**Lição.** A hipótese de monotonicidade se confirmou para contraste, Wavelet fina/grossa,
+energia e entropia, mas o custo em NEx é monotônico também e agora aparece em contagem
+(um NEx alto novo, que a regra de promoção não proíbe, só rejeições e pares). Não subir mais
+este controle: o ganho de textura é real, mas a próxima unidade vem com mais NEx alto. Wavelet
+fina continua defasada em relação à grossa (5,4% contra 11,3%); o controle do ruído de
+condição ajuda as baixas e médias frequências mais que as altas.
+
+**Decisão.** Nova melhor operacional (supera `candidate-06-full`, 33 vitórias contra 4,
+sem rejeições nem pares inválidos). Melhor relatório completo:
+`runs/real/candidate-07-full/report.json`. `workspace/search_state.json` não foi alterado.
+
+## 027 · steps-35 · plano da configuração 6/10 · 2026-10-23
+
+- Configuração: `workspace/candidate.json` = {"steps": 35, "noise_level": 1, "sampler": "ddim", "scale_factor": 1.0, "seed": 42, "eta": 0.2, "latent_noise_scale": 1.0, "conditioning_noise_scale": 1.25}
+- Pastas: `runs/real/candidate-08-screen` (e -quick, -full se `melhor`).
+- Comparado com: baseline (régua) e `candidate-07-*` (melhor atual).
+
+**O que está ruim.** Wavelet fina (+5,4%) e NEx (+1,2%, 4 altos) são as métricas mais fracas;
+a fina está bem atrás da grossa (+11,3%), ou seja, falta alta frequência. Os controles de
+ruído já estão em um ponto em que o próximo incremento custa NEx.
+
+**Parâmetro provável.** `steps`: um passo DDIM menor reduz o salto entre timesteps, o que
+pode melhorar a recuperação de detalhe fino sem injetar mais ruído, logo sem pressionar NEx. É o
+único controle fora da família de ruído ainda não ajustado nesta linha. Evidência: pista de
+outra máquina (entrada 003, eta 0 e condicionamento 1,0): 25 → 35 melhorou fino +2,08 e
+contraste +1,87 pontos, sem mudar NEx. Evidência local contrária ou mista: 50 passos a eta 0
+(entrada 018) deu fino +4,7% mas Wavelet grossa −8,6%. Por isso a mudança é só para 35, não 50;
+a pista também mostrou que 45 passos pioraram a correlação do mapa.
+
+**Mudança.** Só `steps`: 25 → 35, a partir da melhor atual.
+
+**Resposta esperada.** Wavelet fina e contraste GLCM com distância menor; Wavelet grossa,
+correlação do mapa e NEx não podem piorar. Custo de tempo ~40% maior por corte. Se a grossa ou
+a correlação caírem, ou aparecerem NEx altos novos, a hipótese é refutada e `steps` volta a 25.
+
+## 028 · steps-35 resultado (configuração 6/10) · 2026-10-23
+
+- Pastas: `runs/real/candidate-08-screen`, `candidate-08-quick`, `candidate-08-full`.
+- `--baseline` = baseline do escopo; `--compare-to` = `candidate-07-*` do escopo. Plano: entrada 027.
+
+| escopo | melhora vs baseline (08) | melhora da melhor atual (07) | vitórias/derrotas | rejeições / pares novos |
+|---|---|---|---|---|
+| 5 | +16,48% | +8,69% | 5/0 | 0 / 0 |
+| 10 | +15,99% | +8,11% | 9/1 | 0 / 0 |
+| 37 | +16,05% | +7,93% | 36/1 | 0 / 0 |
+
+Nos 37 casos, melhora por métrica (steps 25 → 35): contraste GLCM +7,16% → +15,84%, energia
+GLCM +12,02% → +26,14%, Wavelet fina +5,44% → +13,86%, grossa +11,33% → +19,28%, entropia
++12,28% → +24,86%, LL +6,07% → +8,23%, NEx +1,21% → +4,11%. Nota 72,52 → 74,54. Contagens:
+textura aprovada 26 → 28, final aprovada 13 → 14, brilho aprovado 36 (igual), pares 37/37 ok,
+NEx ok 31 → 30, alto 4 (igual), baixo 0 → 1.
+
+**Regressões a reportar.** Um corte novo com NEx baixo (NEx ok 31 → 30); LL é a métrica que
+menos respondeu (+8,2%); um corte perdeu para a melhor anterior (36/1). Os cinco piores casos
+seguem os mesmos, com notas mais altas: `...1-033` 49,1, `...1-59` 52,6 (escuro), `...1-031` 57,6,
+`...1-65` 58,3, `...1-072` 60,0. Prévias não inspecionadas, só os números do relatório.
+
+**Lição.** Hipótese confirmada, e com efeito muito maior que o dos controles de ruído:
+mais passos (25 → 35) melhoram juntos contraste, fino, grosso, energia e entropia sem
+mexer em validade, ao contrário do que sugeria o teste a eta 0 em 50 passos (018). Sozinho em
+eta 0 o efeito de `steps` era pequeno; com `eta` 0,2 e condicionamento 1,25 a trajetória
+precisa de mais passos para corrigir o ruído injetado, o que indica interação entre os três.
+Pela primeira vez, a meta forte de 15% foi atingida nos 37 casos.
+
+**Decisão.** Nova melhor operacional e meta forte atingida (supera `candidate-07-full`, 36
+vitórias contra 1, sem rejeições nem pares inválidos, 16,05% contra o baseline). Melhor relatório
+completo: `runs/real/candidate-08-full/report.json`. `workspace/search_state.json` não foi alterado.
+
+## 029 · steps-45 · plano da configuração 7/10 · 2026-10-23
+
+- Configuração: `workspace/candidate.json` = {"steps": 45, "noise_level": 1, "sampler": "ddim", "scale_factor": 1.0, "seed": 42, "eta": 0.2, "latent_noise_scale": 1.0, "conditioning_noise_scale": 1.25}
+- Pastas: `runs/real/candidate-09-screen` (e -quick, -full se `melhor`).
+- Comparado com: baseline (régua) e `candidate-08-*` (melhor atual).
+
+**O que está ruim.** Mesmo com 16%, Wavelet fina (+13,9%), LL (+8,2%) e NEx (+4,1%, 4 altos,
+1 baixo) são as mais fracas; os cortes lisos (`...1-033` 49, `...1-031` 58) ainda têm notas baixas.
+
+**Parâmetro provável.** `steps`. Duas medidas (25 e 35) mostram melhora consistente em seis das
+sete métricas ao subir os passos nesta configuração, e a Wavelet fina cresceu mais que a grossa
+(+8,4 p.p. contra +8,0), o que aponta para o recobrimento de alta frequência por passos extras.
+Risco conhecido: a pista de outra máquina (entrada 004, eta 0) mostrou piora em 45 passos,
+com perda de Wavelet grossa e da correlação do mapa; e o efeito pode saturar. Por isso testo
+só um passo de 10, com critério de rejeição claro.
+
+**Mudança.** Só `steps`: 35 → 45, a partir da melhor atual.
+
+**Resposta esperada.** Wavelet fina e LL com distância menor; Wavelet grossa, correlação do
+mapa, NEx e brilho não podem piorar. Se a grossa, a correlação ou o NEx piorarem, ou se o
+ganho médio sobre a melhor atual for menor que o ruído entre escopos, a hipótese é refutada e
+`steps` fica em 35 (sem bisseção para 40).
+
+## 030 · steps-45 resultado (configuração 7/10) · 2026-10-23
+
+- Pasta: `runs/real/candidate-09-screen` (5 casos), comparada com `candidate-08-screen`. Plano: entrada 029.
+
+**Resultado.** Veredito `insuficiente`: ganhou em 2 cortes e perdeu em 3 contra a melhor
+atual (35 passos). Melhora média 16,76% contra 16,48% (+0,28 p.p., dentro do ruído), sem
+rejeições nem pares novos. Nota 63,27 contra 63,89. Por métrica (35 → 45 passos): Wavelet
+grossa +18,65% → +12,11% (pior), contraste GLCM +14,26% → +14,23% (igual), energia GLCM
++23,55% → +23,31% (igual), LL +10,53% → +7,95% (pior), Wavelet fina +14,26% → +15,50%,
+entropia +30,34% → +30,63%, NEx +3,74% → +13,56% (melhor, mas pelo extremo de poucos cortes).
+Textura 3/2/0 e NEx 3 ok / 1 alto / 1 inconclusivo iguais.
+
+**Lição.** Hipótese refutada em parte: Wavelet fina sobe, como previsto, mas a grossa e o LL
+caem, o mesmo padrão que a pista de outra máquina mostrou em 45 passos. O ganho de `steps`
+satura perto de 35 e passa a trocar fino por grosso. Não se testa 40 (bisseção sem hipótese
+nova) e não se sobe mais `steps`.
+
+**Decisão.** Descartada na triagem, não promovida. A melhor atual continua
+`candidate-08-full` (35 passos). `workspace/candidate.json` volta a 35 passos antes da próxima.
+
+## 031 · conditioning-1.40 · plano da configuração 8/10 · 2026-10-23
+
+- Configuração: `workspace/candidate.json` = {"steps": 35, "noise_level": 1, "sampler": "ddim", "scale_factor": 1.0, "seed": 42, "eta": 0.2, "latent_noise_scale": 1.0, "conditioning_noise_scale": 1.4}
+- Pastas: `runs/real/candidate-10-screen` (e -quick, -full se `melhor`).
+- Comparado com: baseline (régua) e `candidate-08-*` (melhor atual).
+
+**O que está ruim.** Na melhor atual, Wavelet fina (+13,9%) e LL (+8,2%) são as mais fracas,
+e NEx tem 4 altos e 1 baixo. Os cortes lisos (`...1-033`, `...1-031`) seguem com nota baixa.
+
+**Parâmetro provável.** `conditioning_noise_scale`. Em 25 passos, 1,10 → 1,25 deu contraste
++2,5 p.p., fino +2,2 e energia +3,8, cobrando 3,2 p.p. de NEx. Com 35 passos o NEx subiu de
++1,2% para +4,1%, ou seja, abriu folga. O controle atua no fino e no contraste, que são o
+alvo; `steps` já saturou e latente/ruído de condição inicial são destrutivos ou sem efeito.
+
+**Mudança.** Só `conditioning_noise_scale`: 1,25 → 1,40, mantendo `steps=35`. Passo de 0,15,
+igual ao anterior, que foi seguro; o limite superior permitido é 1,5.
+
+**Resposta esperada.** Wavelet fina e contraste com distância menor. NEx alto/baixo, Wavelet
+grossa, correlação do par/mapa, brilho e densidade não podem piorar; nenhuma rejeição ou par
+suspeito. Se NEx alto aumentar, a grossa cair ou o par se degradar, a hipótese é refutada e o
+controle volta a 1,25 (sem tentar 1,30).
+
+## 032 · conditioning-1.40 resultado (configuração 8/10) · 2026-10-23
+
+- Pastas: `runs/real/candidate-10-screen`, `candidate-10-quick`, `candidate-10-full`.
+- `--baseline` = baseline do escopo; `--compare-to` = `candidate-08-*` do escopo. Plano: entrada 031.
+
+| escopo | melhora vs baseline (10) | melhora da melhor atual (08) | vitórias/derrotas | rejeições / pares novos |
+|---|---|---|---|---|
+| 5 | +17,95% | +16,48% | 4/1 | 0 / 0 |
+| 10 | +18,07% | +15,99% | 9/1 | 0 / 0 |
+| 37 | +18,51% | +16,05% | 35/2 | 0 / 0 |
+
+Nos 37 casos, melhora por métrica (conditioning 1,25 → 1,40): contraste GLCM +15,84% → +18,87%,
+energia GLCM +26,14% → +30,38%, Wavelet fina +13,86% → +16,20%, grossa +19,28% → +22,92%,
+entropia +24,86% → +29,41%, LL +8,23% → +8,24%, NEx +4,11% → +3,55%. Nota 74,54 → 75,22.
+Contagens: textura aprovada 28 → 30, final aprovada 14 → 15, brilho 36/37 e pares 37/37 ok
+(iguais), NEx 30 ok / 4 altos / 1 baixo / 2 inconclusivos (iguais).
+
+**Regressões a reportar.** NEx perdeu 0,56 p.p. de melhora (nos 5 e 10 casos o NEx ficou
+negativo, −0,17% e −1,06%, e voltou a +3,55% nos 37); LL não se mexeu (+8,2%); 2 cortes
+perderam para a melhor anterior; entropia ficou 0,4 p.p. abaixo de a do `eta` 0,2/steps 25 em outros
+estágios. Os piores casos seguem os mesmos (`...1-033` 49,5, `...1-59` 53,3 escuro, `...1-65`
+58,6, `...1-031` 58,6, `...1-072` 60,6). Prévias não inspecionadas.
+
+**Lição.** A hipótese se confirmou: com 35 passos o NEx deixou de ser o custo do condicionamento
+(as contagens não pioraram), e contraste e Wavelet fina avançaram ~2,3 a 3 p.p. A meta de 15%
+fica sustentada em 5, 10 e 37 casos. LL não responde a nenhum controle testado: provavelmente
+liga-se ao brilho/densidade (os casos escuros `...1-59` e `...1-072`), que nenhum controle de
+amostragem permitido ataca.
+
+**Decisão.** Nova melhor operacional e meta forte atingida (supera `candidate-08-full`, 35
+vitórias contra 2, sem rejeições nem pares inválidos, 18,51% contra o baseline). Melhor relatório
+completo: `runs/real/candidate-10-full/report.json`. `workspace/search_state.json` não foi alterado.
+
+## 033 · eta-0.30 · plano da configuração 9/10 · 2026-10-23
+
+- Configuração: `workspace/candidate.json` = {"steps": 35, "noise_level": 1, "sampler": "ddim", "scale_factor": 1.0, "seed": 42, "eta": 0.3, "latent_noise_scale": 1.0, "conditioning_noise_scale": 1.4}
+- Pastas: `runs/real/candidate-11-screen` (e -quick, -full se `melhor`).
+- Comparado com: baseline (régua) e `candidate-10-*` (melhor atual).
+
+**O que está ruim.** Wavelet fina (+16,2%), LL (+8,2%) e NEx (+3,6%, 4 altos) seguem as
+mais fracas; cortes lisos (`...1-033`, `...1-031`) com notas abaixo de 60.
+
+**Parâmetro provável.** `eta`, o único controle de ruído que não foi movido desde 0,2 e que
+tem efeito local medido: de 0 a 0,2 melhorou todas as sete métricas e o NEx. Uma pista de outra
+máquina diz que energia, entropia e LL respondem a `eta` até 0,25 e que o NEx alto individual
+reaparece perto de 0,2. O condicionamento está perto do teto permitido (1,5), então `eta` é
+o grau de liberdade que sobra para o fino. Interações já observadas: `steps` e condicionamento
+mudaram a resposta do `eta`.
+
+**Mudança.** Só `eta`: 0,20 → 0,30, mantendo `steps=35` e condicionamento 1,40.
+
+**Resposta esperada.** Wavelet fina e LL com distância menor; NEx alto e Wavelet grossa não
+podem piorar; sem rejeição nem par suspeito. Se NEx alto aumentar ou a grossa cair, a hipótese
+é refutada e `eta` volta a 0,20 (sem testar 0,25).
+
+## 034 · eta-0.30 resultado (configuração 9/10) · 2026-10-23
+
+- Pastas: `runs/real/candidate-11-screen`, `candidate-11-quick`, `candidate-11-full`.
+- `--baseline` = baseline do escopo; `--compare-to` = `candidate-10-*` do escopo. Plano: entrada 033.
+
+| escopo | melhora vs baseline (11) | melhora da melhor atual (10) | vitórias/derrotas | rejeições / pares novos |
+|---|---|---|---|---|
+| 5 | +22,41% | +17,95% | 5/0 | 0 / 0 |
+| 10 | +20,82% | +18,07% | 7/3 | 0 / 0 |
+| 37 | +21,24% | +18,51% | 22/15 | 0 / 0 |
+
+Nos 37 casos, melhora por métrica (eta 0,2 → 0,3): contraste GLCM +18,87% → +19,36%, energia GLCM
++30,38% → +32,02%, Wavelet fina +16,20% → +16,56%, grossa +22,92% → +25,21%, entropia +29,41% →
++30,33%, LL +8,24% → +11,45%, NEx +3,55% → +13,78%. Nota 75,22 → 76,06. Contagens: textura aprovada
+30 (igual), final aprovada 15 → 16, brilho 36/37 e pares 37/37 ok (iguais), NEx ok 30 → 31, altos
+4 → 3, baixo 1, inconclusivos 2.
+
+**Regressões a reportar.** O ganho se concentra em NEx (+10,2 p.p.), LL (+3,2) e Wavelet
+grossa (+2,3); contraste e Wavelet fina quase não se mexeram (+0,5 e +0,4). 15 cortes
+perderam contra a melhor anterior contra 22 que ganharam: a vantagem por corte é estreita,
+e a média melhor vem de poucos cortes grandes (NEx). Os piores casos seguem os mesmos
+(`...1-033` 50,1, `...1-59` 52,7 escuro, `...1-031` 57,6, `...1-65` 58,3, `...1-072` 61,5).
+Prévias não inspecionadas.
+
+**Lição.** A hipótese se confirmou para LL e NEx, como previsto, sem NEx alto novo nem queda
+da grossa. Não se confirmou para fino e contraste. Efeito por caso heterogêneo, coerente com o
+risco de estocasticidade: uma média melhor com ganho por corte estreito. A regra de promoção
+operacional é cumprida (22 > 15), mas a confiança é menor que nas tentativas 026 e 032.
+
+**Decisão.** Nova melhor operacional e meta forte atingida (21,24% contra o baseline; supera
+`candidate-10-full`, 22 vitórias contra 15, sem rejeições nem pares inválidos). Melhor relatório
+completo: `runs/real/candidate-11-full/report.json`. `workspace/search_state.json` não foi alterado.
+
+## 035 · eta-0.40 · plano da configuração 10/10 · 2026-10-23
+
+- Configuração: `workspace/candidate.json` = {"steps": 35, "noise_level": 1, "sampler": "ddim", "scale_factor": 1.0, "seed": 42, "eta": 0.4, "latent_noise_scale": 1.0, "conditioning_noise_scale": 1.4}
+- Pastas: `runs/real/candidate-12-screen` (e -quick, -full se `melhor`).
+- Comparado com: baseline (régua) e `candidate-11-*` (melhor atual). Última do orçamento.
+
+**O que está ruim.** Wavelet fina (+16,6%), LL (+11,5%) e a vantagem por corte (22/15) são os
+pontos fracos; os cortes lisos (`...1-033`, `...1-031`) seguem abaixo de 60.
+
+**Parâmetro provável.** `eta`. Duas medidas locais seguidas (0 → 0,2 e 0,2 → 0,3, com os
+demais controles já mudados) mostram média crescente em LL e NEx, e a resposta de LL é a
+única que nenhum outro controle moveu. O restante dos controles está saturado: `steps` em 45
+trocou grosso por fino, o latente rompe o par e o condicionamento está perto do teto (1,5).
+
+**Mudança.** Só `eta`: 0,30 → 0,40, mantendo `steps=35` e condicionamento 1,40. Passo de 0,10,
+igual ao anterior.
+
+**Resposta esperada.** LL e NEx continuam subindo; Wavelet fina e contraste, que não se
+moveram com 0,3, podem se mexer. NEx alto, Wavelet grossa e a correlação do par não podem
+piorar; sem rejeição nem par suspeito. Se o NEx alto aumentar, a grossa cair ou a vantagem por
+corte ficar abaixo da metade, a hipótese é refutada e a melhor continua em `eta` 0,30. O
+orçamento termina nesta tentativa.
+
+## 036 · eta-0.40 resultado e encerramento (configuração 10/10) · 2026-10-23
+
+- Pastas: `runs/real/candidate-12-screen`, `candidate-12-quick`, `candidate-12-full`.
+- `--baseline` = baseline do escopo; `--compare-to` = `candidate-11-*` do escopo. Plano: entrada 035.
+
+| escopo | melhora vs baseline (12) | melhora da melhor atual (11) | vitórias/derrotas | rejeições / pares novos |
+|---|---|---|---|---|
+| 5 | +25,27% | +22,41% | 4/1 | 0 / 0 |
+| 10 | +24,14% | +20,82% | 8/2 | 0 / 0 |
+| 37 | +23,05% | +21,24% | 27/10 | 0 / 0 |
+
+Nos 37 casos, melhora por métrica (eta 0,3 → 0,4): contraste GLCM +19,36% → +19,81%, energia GLCM
++32,02% → +33,56%, Wavelet fina +16,56% → +16,80%, grossa +25,21% → +26,88%, entropia +30,33% →
++29,83%, LL +11,45% → +14,52%, NEx +13,78% → +19,95%. Nota 76,06 → 76,73. Contagens: textura
+aprovada 30 (igual), final aprovada 16 → 18, brilho 36/37 e pares 37/37 ok (iguais), NEx ok 31 → 32,
+altos 3 → 2, baixo 1, inconclusivos 2.
+
+**Regressões a reportar.** Entropia Wavelet perdeu 0,5 p.p.; contraste e fina só ganharam
++0,4 a +0,5 p.p. (nos 10 casos recuaram cerca de 1 p.p.); 10 cortes perderam para a melhor
+anterior. Os piores casos seguem os mesmos (`...1-033` 50,5, `...1-59` 52,3 escuro, `...1-031`
+56,9, `...1-65` 58,2, `...1-072` 62,0). Brilho continua com 1 caso em revisão e textura com 7.
+Prévias não inspecionadas.
+
+**Lição.** `eta` até 0,4 continua melhorando LL e NEx e agora também a contagem de finais
+aprovadas, sem rejeições. Contraste e Wavelet fina saturaram em ~+20% e ~+17%, e os cortes
+lisos e escuros não respondem a nenhum controle de amostragem permitido.
+
+**Decisão.** Nova melhor operacional (27 vitórias contra 10, sem rejeições nem pares inválidos,
+23,05% contra o baseline, meta forte de 15% atingida). Melhor relatório completo:
+`runs/real/candidate-12-full/report.json`. Orçamento de 10 configurações esgotado: encerro a busca.
+`workspace/candidate.json` fica com a melhor configuração; `workspace/search_state.json` não foi
+alterado (fora da área de escrita).
