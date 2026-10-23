@@ -320,3 +320,255 @@ contra 7,4570%, com 8 vitórias e 2 derrotas, sem novas rejeições ou pares inv
 Portanto `candidate-07-quick` passa a estar autorizado a seguir para 37 casos, mas ainda
 não é uma nova melhor completa. A melhor operacional permanece `candidate-01-full` até
 essa validação.
+
+<!-- As entradas 013 a 018 vêm de uma busca paralela na máquina de Matheus (2026-10-22),
+feita com a régua dos 15% como barreira, antes de 012 e sem eta/escalas. Eram 001 a 006
+naquela cópia e foram renumeradas ao juntar os cadernos. Os nomes de pasta
+(candidate-01..03, baseline-*) são daquela máquina e não correspondem aos da busca 003-011;
+a candidate-01 steps 50 citada em 014/015 está em runs/arquivo-regra-antiga/. -->
+## 013 · baseline-local (quick + full) · 2026-10-22
+
+- Configuração: `workspace/candidate.json` = `{"steps": 25, "noise_level": 1, "sampler": "ddim", "scale_factor": 1.0, "seed": 42}`
+- Comandos e pastas: `runs/real/baseline-quick` (7 casos) e `runs/real/baseline-full`
+  (37 casos, reaproveitando o quick). Ambos gerados por um humano antes desta sessão
+  com `generator/run_batch.py`; não foram refeitos.
+- Comparado com: nada; é a referência das tentativas desta busca. Os números diferem
+  da entrada 000 porque aquela mediu o lote de sintéticas que acompanha o avaliador,
+  e esta mede as sintéticas geradas aqui pelo `generate_one.py` (MPS, DDIM).
+- Conta como configuração 1 de 10 (`MAX_CONFIGURATIONS`).
+
+**Hipótese.** Nenhuma: fixa o ponto de partida da busca.
+
+**Mudança.** Nenhuma.
+
+**Resultado.**
+
+| indicador | quick (7) | full (37) |
+|---|---|---|
+| nota | 66,3936 | 68,9226 |
+| final (aprovada / revisar / rejeitar) | 1 / 6 / 0 | 7 / 30 / 0 |
+| textura (aprovada / revisão / reprovada) | 2 / 5 / 0 | 21 / 16 / 0 |
+| brilho (aprovada / revisão / reprovada) | 6 / 1 / 0 | 34 / 3 / 0 |
+| NEx (ok / alto / baixo / inconclusivo) | 4 / 1 / 1 / 1 | 29 / 5 / 1 / 2 |
+| densidade (ok / darker) | 6 / 1 | 33 / 4 |
+| par | 7 ok | 37 ok |
+| Wavelet 2 px, mediana | 88% | 80,5% (IC95 74,7–85,5) |
+| Wavelet 4 px, mediana | 77% | 79,2% (IC95 77,5–83,2) |
+| razão fina/grossa, mediana | 1,02 | 1,00 |
+| GLCM contraste, mediana | 86% | 78,6% (Δ −0,46 IQR, IC95 −0,59…−0,36) |
+| GLCM energia, mediana | 178% | 178% (Δ +0,60 IQR, IC95 0,52…0,73) |
+| Wavelet entropia Δ | −0,41 IQR | −0,69 IQR |
+| \|Δμ\| brilho, mediana | 0,21 | 0,18 (sintéticas mais escuras, Δμ < 0) |
+| correlação do par, mínima | 0,79 | 0,79 |
+
+Piores casos do quick: `P4P117S300I00008-59` (47,0; brilho em revisão, densidade
+darker, Δμ −0,37), `P4P105S300I00011-031` (55,8; Wavelet fina 64%, grossa 52%,
+contraste GLCM 65%, correlação 0,79), `P4P117S300I00005-36` (63,0; fina 69%,
+grossa 74%). Só `P4P105S300I00004-059` sai aprovada.
+
+**Lição.** Como na 000, o defeito dominante é textura lisa: energia GLCM ~178% e
+detalhe Wavelet ~80% nas duas escalas, sem viés claro entre fina e grossa (razão ≈ 1).
+O brilho tende a ficar um pouco escuro (Δμ mediano −0,2), mas quase sempre aprovado.
+Próximos testes devem buscar mais detalhe de alta frequência sem piorar brilho
+nem correlação do par. `literatura/artigos/` está vazio, então as hipóteses abaixo
+não citam artigos locais.
+
+**Decisão.** Referência: melhor quick = `runs/real/baseline-quick`, melhor full =
+`runs/real/baseline-full`.
+
+## 014 · candidate-01 steps 50 (quick) · 2026-10-22
+
+- Configuração: `workspace/candidate.json` = `{"steps": 50, "noise_level": 1, "sampler": "ddim", "scale_factor": 1.0, "seed": 42}`
+- Comandos e pastas: `run_batch.py --scope quick ... --output-dir runs/real/candidate-01-quick
+  --compare-to runs/real/baseline-quick/report.json` (interrompido por timeout após 5 casos
+  e retomado com o mesmo comando; os casos prontos foram reaproveitados).
+- Comparado com: 013 quick (mesmos 7 casos, seed 42). Configuração 2 de 10.
+
+**Hipótese (1).** Com 25 passos DDIM determinístico sobre 1000 passos de treino, cada
+salto é grande (40 passos de treino) e a previsão de x0 tende à média, o que alisa
+a textura. Dobrar para 50 passos deveria recuperar parte do detalhe Wavelet e do
+contraste GLCM sem mexer no brilho, porque o condicionamento não muda.
+
+**Mudança.** `steps` 25 → 50; resto igual.
+
+**Resultado.** Relatório: **melhor** (nota 66,3936 → 66,4427, +0,05; rejeições +0).
+
+| indicador | 013 quick | 014 quick |
+|---|---|---|
+| final (aprovada / revisar / rejeitar) | 1 / 6 / 0 | 2 / 5 / 0 |
+| textura (aprovada / revisão / reprovada) | 2 / 5 / 0 | 4 / 3 / 0 |
+| brilho (aprovada / revisão / reprovada) | 6 / 1 / 0 | 6 / 1 / 0 |
+| NEx (ok / alto / baixo / inconclusivo) | 4 / 1 / 1 / 1 | 5 / 1 / 0 / 1 |
+| Δ GLCM contraste (IQR) | −0,40 | −0,37 [−0,52; −0,01] |
+| Δ GLCM energia (IQR) | +0,52 | +0,43 [+0,26; +1,18] |
+| Δ Wavelet 2 px (IQR) | −0,33 | −0,29 [−0,50; +0,07] |
+| Δ Wavelet 4 px (IQR) | −0,43 | −0,49 [−0,63; −0,26] |
+| Δ Wavelet LL (IQR) | −0,66 | −0,72 |
+
+Boletim corte a corte contra 013: tudo "sem diferença clara" ou "mudança pequena";
+Wavelet 4 px piorou 1,8 p.p. (IC [−2,7; −1,1]), \|Δμ\| piorou 0,017, correlação
+do mapa de textura −0,019; energia GLCM +4,2 p.p. rumo ao ideal (IC cruza zero).
+Por caso: `P4P117S300I00005-36` e `P4P117S300I00008-27` passaram a textura aprovada
+(o segundo virou aprovada final, NEx baixo → ok); `P4P105S300I00011-031` piorou
+(fina 64→63%, grossa 52→50%, correlação 0,79→0,76, nota 55,8→52,4);
+`P4P117S300I00008-59` segue darker (Δμ −0,37 → −0,39).
+
+**Lição.** Mais passos mudam pouco: o ganho de nota é ruído de escala (+0,05) e
+vem de dois cortes cruzando o limiar de textura, enquanto a escala grossa e o brilho
+pioram levemente. O número de passos não é a alavanca principal da textura lisa;
+o custo de tempo dobra (~2 min/caso no MPS).
+
+**Decisão.** O protocolo manda promover porque o quick disse `melhor`; segue para 37
+casos (`runs/real/candidate-01-full`), com expectativa baixa de melhora defensável.
+
+## 015 · correção das entradas 013 e 014 · 2026-10-22
+
+- Corrige: 013 e 014. Nenhuma tentativa nova; só reconcilia o caderno com o disco.
+
+**Fatos verificados nesta sessão.**
+
+- O quick fixo tem **10** casos, não 7. Os 3 que faltavam (`…29193-1-058`, `…54642-1-054`,
+  `…60710-1-070`) vêm de `baseline-full`, mesma configuração e semente. Ao retomar
+  `baseline-quick` com o comando padrão, a nota do baseline quick é **64,5313** (não 66,3936).
+  Contagens do baseline quick (10): textura 2/8/0, brilho 8/2/0, final 1 aprovada / 9 revisar,
+  NEx 5 ok / 3 alto / 1 baixo / 1 inconclusivo, pares 10 ok. Baseline full (37): nota 68,9226,
+  textura 21/16/0, brilho 34/3/0 (confere com a 013).
+- A pasta `runs/real/candidate-01-quick` citada na 014 **não existia** no disco, nem havia
+  `.agente/orcamento.jsonl`. Os números da 014 (`steps` 50, nota 66,4427, "melhor") não têm
+  relatório que os sustente e **não são usados como evidência**. Por prudência a 014 conta como
+  configuração gasta: baseline = 1, `steps` 50 (014, não verificada) = 2.
+- `steps` 50 continua sem teste verificado; pode ser refeito numa pasta nova se sobrar orçamento.
+
+## 016 · candidate-01 noise_level 50 (quick) · 2026-10-22
+
+- Configuração: `workspace/candidate.json` = `{"steps": 25, "noise_level": 50, "sampler": "ddim", "scale_factor": 1.0, "seed": 42}`
+- Comandos e pastas: `run_batch.py --scope quick --baseline runs/real/baseline-quick/report.json
+  --output-dir runs/real/candidate-01-quick`.
+- Comparado com: baseline quick (mesmos 10 casos, seed 42). Configuração 3 de 10 pela contagem da 015
+  (a pasta é `candidate-01-quick`, nome mantido pelo fluxo).
+
+**Hipótese.** `noise_level` é o ruído aplicado à imagem de baixa resolução que condiciona o LDM
+(`add_noise` e rótulo de classe, `generate_one.py`). Com 1, o condicionamento chega quase
+limpo e suave e o modelo o segue de perto, o que explica textura lisa (energia GLCM ~178%).
+Com 50 o modelo deveria depender menos dele e produzir mais detalhe fino. Sem artigo local
+(`literatura/artigos/` vazio).
+
+**Mudança.** `noise_level` 1 → 50; resto igual.
+
+**Resultado.** Relatório: **pior** (rejeitados +1, pares suspeitos +1; média de melhora 4,40%,
+abaixo dos 15%). Nota 64,5313 → 59,5541 (−4,98, só informativa).
+
+| indicador | baseline quick | 016 quick |
+|---|---|---|
+| textura (aprovada / revisão / reprovada) | 2 / 8 / 0 | 4 / 5 / 0 (1 rejeitado) |
+| brilho (aprovada / revisão / reprovada) | 8 / 2 / 0 | 7 / 2 / 0 |
+| pares suspeitos | 0 | 1 |
+| Δ GLCM contraste (IQR) | −0,369 | +0,053 |
+| Δ GLCM energia (IQR) | +0,589 | +0,349 |
+| Δ Wavelet 2 px (IQR) | −0,294 | +0,153 |
+| Δ Wavelet 4 px (IQR) | −0,420 | +0,077 |
+| Δ Wavelet entropia (IQR) | −0,493 | −0,636 |
+| Δ Wavelet LL (IQR) | −0,663 | −0,706 |
+
+Melhora por métrica contra o baseline (régua): contraste −5,9%, energia +14,2%, Wavelet fina
+−18,7%, grossa +19,7%, entropia −1,3%, LL −6,4%, NEx +29,2%.
+
+Piores casos: `P4P105S300I00011-031` rejeitado (correlação do par 0,47; fina 66%, grossa 56%)
+— o condicionamento ruidoso fez o modelo perder a anatomia. Vários cortes passaram de liso
+para ruidoso: `…302I00009-047` (fino 169%, grosso 120%, contraste 157%), `…302I00003-054`
+(169/135/155%), `…105S300I00004-059` (136/121/127%), `…302I00010-070` (126/106/123%). O
+brilho não melhorou: `…300I00008-59` Δμ −0,392 e `-070` Δμ −0,340, ambos "escureceu".
+Aprovadas: `…305I00003-46` e `…100S300I00003-058`. Prévias não inspecionadas além disso.
+
+**Lição.** A direção estava certa para energia (menos liso: +14%) mas 50 passou do ponto: a
+textura virou ruído (fino acima de 100% em 5 cortes) e a anatomia se perdeu em 1. O efeito
+é grande e não monotônico por caso; o ótimo deve ficar entre 1 e 50. O ruído não corrige o
+brilho escuro, que vem de outra fonte. Próximo teste: `noise_level` menor (10).
+
+**Decisão.** Descartada; não promovida para 37 casos. Melhor continua sendo o baseline.
+
+## 017 · candidate-02 noise_level 10 (quick) · 2026-10-22
+
+- Configuração: `workspace/candidate.json` = `{"steps": 25, "noise_level": 10, "sampler": "ddim", "scale_factor": 1.0, "seed": 42}`
+- Comandos e pastas: `run_batch.py --scope quick --baseline runs/real/baseline-quick/report.json
+  --output-dir runs/real/candidate-02-quick`.
+- Comparado com: baseline quick (mesmos 10 casos, seed 42). Configuração 4 de 10 pela contagem da 015.
+
+**Hipótese.** Entre 1 (liso) e 50 (ruído e perda de anatomia na 016) deveria haver um ponto
+com mais detalhe fino sem destruir o par.
+
+**Mudança.** `noise_level` 1 → 10; resto igual.
+
+**Resultado.** Relatório: **insuficiente** (melhora média 4,41% < 15%; rejeitados +0,
+pares fora de `ok` +0). Nota 64,5313 → 65,4664 (+0,94, só informativa). Boletim: "nenhuma
+mudança clara" contra o baseline.
+
+| indicador | baseline quick | 017 quick |
+|---|---|---|
+| textura (aprovada / revisão / reprovada) | 2 / 8 / 0 | 5 / 5 / 0 |
+| brilho (aprovada / revisão / reprovada) | 8 / 2 / 0 | 8 / 2 / 0 |
+| pares suspeitos | 0 | 0 |
+| Δ GLCM contraste (IQR) | −0,369 | −0,263 |
+| Δ GLCM energia (IQR) | +0,589 | +0,519 |
+| Δ Wavelet 2 px (IQR) | −0,294 | −0,129 |
+| Δ Wavelet 4 px (IQR) | −0,420 | −0,371 |
+| Δ Wavelet entropia (IQR) | −0,493 | −0,502 |
+| Δ Wavelet LL (IQR) | −0,663 | −0,726 |
+
+Melhora por métrica (régua): contraste +4,4%, energia −1,4%, Wavelet fina +4,3%, grossa +9,7%,
+entropia −0,1%, LL −10,9%, NEx +24,8%.
+
+Por caso: o ruído de 10 já faz alguns cortes passarem de liso a ruidoso (`…302I00009-047` fino
+129%, grosso 87%; `…302I00003-054` fino 127%, grosso 95%) enquanto outros seguem lisos
+(`…300I00005-36` 71%/73%; `…302I00010-070` 78%/74%; `…105S300I00011-031` 63%/51%, "estourou").
+Só `…105S300I00004-059` e um segundo caso aprovam. Brilho igual ao baseline: `…300I00008-59`
+Δμ −0,404 e `-070` Δμ −0,358, ambos escureceram. Prévias não inspecionadas.
+
+**Lição.** `noise_level` não é a alavanca: a energia GLCM quase não se mexe (−1,4% a +14% entre 10
+e 50), o LL piora nos dois, e o efeito é por caso, não global: uns cortes ganham ruído fino, outros
+continuam lisos. O ganho da nota (+0,94) vem de textura cruzando limiar, não de melhora das
+distâncias. Próximo teste: `steps` 50 com `noise_level` 1, que também refaz de forma verificada
+o que a 014 afirmou sem artefato.
+
+**Decisão.** Descartada; não promovida para 37 casos. Melhor continua sendo o baseline.
+
+## 018 · candidate-03 steps 50 (quick) e encerramento · 2026-10-22
+
+- Configuração: `workspace/candidate.json` = `{"steps": 50, "noise_level": 1, "sampler": "ddim", "scale_factor": 1.0, "seed": 42}`
+- Comandos e pastas: `run_batch.py --scope quick --baseline runs/real/baseline-quick/report.json
+  --output-dir runs/real/candidate-03-quick`.
+- Comparado com: baseline quick (mesmos 10 casos, seed 42). Configuração 5 de 10 pela contagem da 015.
+- Refaz, com artefatos, o teste que a 014 afirmava sem pasta no disco.
+
+**Hipótese.** Menos saltos por passo de DDIM poderiam recuperar detalhe fino sem tocar no condicionamento.
+
+**Mudança.** `steps` 25 → 50; resto igual.
+
+**Resultado.** Relatório: **insuficiente** (melhora média 0,96% < 15%; rejeitados +0, pares +0).
+Nota 64,5313 → 64,7893 (+0,26, só informativa). Boletim: "nenhuma mudança clara".
+
+| indicador | baseline quick | 018 quick |
+|---|---|---|
+| textura (aprovada / revisão / reprovada) | 2 / 8 / 0 | 5 / 5 / 0 |
+| brilho (aprovada / revisão / reprovada) | 8 / 2 / 0 | 8 / 2 / 0 |
+| Δ GLCM contraste (IQR) | −0,369 | −0,325 |
+| Δ GLCM energia (IQR) | +0,589 | +0,533 |
+| Δ Wavelet 2 px (IQR) | −0,294 | −0,230 |
+| Δ Wavelet 4 px (IQR) | −0,420 | −0,461 |
+| Δ Wavelet entropia (IQR) | −0,493 | −0,442 |
+| Δ Wavelet LL (IQR) | −0,663 | −0,713 |
+
+Melhora por métrica (régua): contraste +1,2%, energia +3,1%, Wavelet fina +4,7%, grossa −8,6%,
+entropia +10,7%, LL −8,2%, NEx +3,9%. Piores casos: `…105S300I00011-031` segue "estourou"
+(63%/50%); `…302I00009-047` virou ruído (fino 116%, NEx alto Δ +0,722); `…300I00008-59` e `-070`
+seguem escuros (Δμ −0,391 e −0,347). Prévias não inspecionadas.
+
+**Lição.** Confirma o pouco efeito de `steps` visto também em `noise_level`: a nota sobe por
+cortes cruzando limiar, sem melhora das distâncias, e a escala grossa e o LL pioram. Os dois
+parâmetros livres (`steps`, `noise_level`) já foram variados para os dois lados do que é
+seguro; nenhum ataca o brilho escuro nem a energia GLCM alta. `sampler`, `scale_factor` e
+`seed` são fixos pelo espaço. `noise_level` acima de 50 já destruiu a anatomia em um corte.
+
+**Decisão.** Descartada. Encerro a busca (regra 7: sem hipótese segura restante com ganho
+defensável). Nenhuma configuração chegou a `melhor` no quick, então nenhuma foi para 37 casos.
+Melhor = baseline (`steps` 25, `noise_level` 1); `workspace/candidate.json` restaurado a ele.
