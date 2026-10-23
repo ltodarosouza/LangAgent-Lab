@@ -23,6 +23,7 @@ import argparse
 import csv
 import json
 import math
+import os
 import subprocess
 import sys
 from datetime import datetime
@@ -169,39 +170,116 @@ class Funnel:
 
     Cada etapa só começa se os casos novos dela cabem no orçamento restante; se não
     cabem, a configuração fica no último escopo concluído e o método termina.
+
+    Pastas: `<out_root>/<prefixo>-NN-<escopo>`; log: `<out_root>/<prefixo>-log.jsonl`,
+    gravado a cada etapa. Retomada: se o log já existe, o estado (cache, orçamento gasto,
+    melhor atual) é reconstruído dele, e as propostas do otimizador reiniciado são
+    servidas do log, na mesma ordem, sem custo e sem nova linha. Se o otimizador
+    propuser algo diferente do registrado, o log ganha uma linha `divergencia` e a busca
+    segue normalmente dali. Uma etapa interrompida com a mesma configuração é retomada
+    pelo próprio run_batch.py; com outra configuração, a pasta é renomeada para
+    `...-abandonado-<data>` e os casos já gerados nela contam no orçamento.
     """
 
-    def __init__(self, backend, space: Space, baseline: dict, out_dir: Path, budget: int, method: str):
+    def __init__(self, backend, space: Space, baseline: dict, out_root: Path, prefix: str,
+                 budget: int, method: str, header: dict):
         self.backend = backend
         self.space = space
-        self.out_dir = out_dir
+        self.out_root = out_root
+        self.prefix = prefix
         self.budget = budget
         self.method = method
         self.used = 0
         self.index = 0
         self.cache = {}
+        self.journal = []
+        self.replay_pos = 0
+        self.crash_after = None  # só para testar a retomada
+        self.stages_run = 0
         self.baseline_paths = backend.baseline_paths
         self.best = {"candidate": baseline, "paths": dict(self.baseline_paths), "improvement": 0.0}
-        self.log_path = out_dir / "log.jsonl"
-        out_dir.mkdir(parents=True, exist_ok=True)
-        if self.log_path.exists():
-            raise SystemExit(f"{self.log_path} já existe; use outra --tag (nada é sobrescrito)")
+        self.log_path = out_root / f"{prefix}-log.jsonl"
+        out_root.mkdir(parents=True, exist_ok=True)
         # O baseline é a régua fixa: entra como ponto conhecido, sem custo.
         self.cache[key_of(baseline)] = {
             "candidate": baseline, "scope": "full", "value": 0.0, "full": True,
             "feasible": True, "rejected": 0, "pair_issues": 0, "verdict": "baseline",
         }
-        self._log({"event": "baseline", "candidate": baseline, "scope": "full", "cases_generated": 0,
-                   "mean_improvement_pct": 0.0, "verdict": "baseline"})
+        if self.log_path.exists():
+            self._resume(header)
+        else:
+            self._log({"event": "inicio", **header})
+            self._log({"event": "baseline", "candidate": baseline, "scope": "full", "cases_generated": 0,
+                       "mean_improvement_pct": 0.0, "verdict": "baseline"})
+
+    def stage_dir(self, index: int, scope: str) -> Path:
+        return self.out_root / f"{self.prefix}-{index:02d}-{scope}"
+
+    def _resume(self, header: dict) -> None:
+        rows = [json.loads(line) for line in self.log_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+        previous = rows[0]
+        mismatched = {key: (previous.get(key), value) for key, value in header.items() if previous.get(key) != value}
+        if previous.get("event") != "inicio" or mismatched:
+            raise SystemExit(f"{self.log_path} é de outra execução ({mismatched}); use outro --out-root")
+        for row in rows:
+            event = row["event"]
+            if event in ("etapa", "orcamento_esgotado"):
+                self.cache[key_of(row["candidate"])] = {
+                    "candidate": row["candidate"], "scope": row["scope"], "value": row["mean_improvement_pct"],
+                    "full": row["scope"] == "full",
+                    "feasible": not row.get("rejected") and not row.get("pair_issues"),
+                    "rejected": row.get("rejected", 0), "pair_issues": row.get("pair_issues", 0),
+                    "verdict": row["verdict"],
+                }
+            if (event == "etapa" and row["scope"] == "screen") or event == "cache":
+                self.journal.append(key_of(row["candidate"]))
+            if row.get("new_best"):
+                self.best = {"candidate": row["candidate"],
+                             "paths": {scope: Path(path) for scope, path in row["best_paths"].items()},
+                             "improvement": row["mean_improvement_pct"]}
+            self.used = row["cases_cumulative"]
+            self.index = max(self.index, row["config_index"])
+        self._log({"event": "retomada", "journal": len(self.journal)})
+        print(f"Retomando {self.log_path}: {self.index} configurações, {self.used} casos, "
+              f"{len(self.journal)} propostas para reproduzir", flush=True)
+
+    @property
+    def replaying(self) -> bool:
+        return self.replay_pos < len(self.journal)
+
+    def replay_candidates(self) -> list:
+        """Configurações do diário, na ordem em que foram propostas (para o GP reencenar)."""
+        return [json.loads(key) for key in self.journal]
 
     def _log(self, row: dict) -> None:
         row = {"method": self.method, "config_index": self.index, "cases_cumulative": self.used,
                "best_full_improvement_pct": self.best["improvement"], **row}
         with self.log_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+            handle.flush()
+
+    def _clear_stale_dir(self, run_dir: Path, candidate: dict) -> None:
+        if not run_dir.exists():
+            return
+        report_path = run_dir / "report.json"
+        if report_path.exists() and load_report(report_path)["candidate"] == candidate:
+            return  # mesma configuração: run_batch.py retoma os casos prontos
+        generated = len(list((run_dir / "synthetics").glob("*.tiff"))) if (run_dir / "synthetics").exists() else 0
+        target = run_dir.with_name(f"{run_dir.name}-abandonado-{datetime.now():%Y%m%d-%H%M%S}")
+        run_dir.rename(target)
+        self.used += generated
+        self._log({"event": "abandonado", "scope": None, "cases_generated": generated, "report": str(target),
+                   "verdict": "pasta de outra configuração, interrompida"})
 
     def evaluate(self, candidate: dict) -> dict:
         key = key_of(candidate)
+        if self.replaying:
+            if self.journal[self.replay_pos] == key:
+                self.replay_pos += 1
+                return self.cache[key]
+            self._log({"event": "divergencia", "candidate": candidate, "scope": None, "cases_generated": 0,
+                       "verdict": f"proposta difere do diário na posição {self.replay_pos}"})
+            self.replay_pos = len(self.journal)
         if key in self.cache:
             result = self.cache[key]
             self._log({"event": "cache", "candidate": candidate, "scope": result["scope"],
@@ -219,11 +297,16 @@ class Funnel:
                 self.cache[key] = result
                 self._log({"event": "orcamento_esgotado", "candidate": candidate, "scope": result["scope"],
                            "cases_generated": 0, "mean_improvement_pct": result["value"],
-                           "verdict": "parada por orçamento"})
+                           "rejected": result["rejected"], "pair_issues": result["pair_issues"],
+                           "verdict": result["verdict"], "reason": "a próxima etapa não cabe no orçamento"})
                 raise BudgetExhausted
-            run_dir = self.out_dir / f"c{self.index:02d}-{scope}"
+            run_dir = self.stage_dir(self.index, scope)
+            self._clear_stale_dir(run_dir, candidate)
+            if self.crash_after is not None and self.stages_run >= self.crash_after:
+                raise SystemExit(f"queda simulada antes de {run_dir.name}")
             report = self.backend.run_stage(candidate, scope, run_dir, previous,
                                             self.baseline_paths[scope], self.best["paths"][scope])
+            self.stages_run += 1
             facts = report_facts(report)
             self.used += facts["generated"]
             comparison = report["comparison"]
@@ -237,7 +320,7 @@ class Funnel:
             if promoted:
                 self.best = {
                     "candidate": candidate,
-                    "paths": {s: self.out_dir / f"c{self.index:02d}-{s}" / "report.json" for s in SCOPES},
+                    "paths": {s: self.stage_dir(self.index, s) / "report.json" for s in SCOPES},
                     "improvement": comparison["mean_improvement_pct"],
                 }
             self._log({
@@ -249,6 +332,7 @@ class Funnel:
                 "case_wins": comparison["case_distance_wins"], "case_losses": comparison["case_distance_losses"],
                 "rejected": facts["rejected"], "pair_issues": facts["pair_issues"],
                 "new_best": promoted, "report": str(run_dir / "report.json"),
+                **({"best_paths": {s: str(p) for s, p in self.best["paths"].items()}} if promoted else {}),
             })
             if comparison["verdict"] != "melhor":
                 break
@@ -283,6 +367,8 @@ def run_gp(funnel: Funnel, space: Space, baseline: dict, seed: int, stopped_mode
     - `escopo`: a melhora no escopo em que parou, como no Nelder-Mead.
     Se o GP repropõe uma configuração já medida, o resultado conhecido é repetido (sem
     custo) e a próxima proposta vem da sequência Sobol, para não girar em falso.
+    Na retomada, as propostas do log são reenfileiradas na ordem original, para o GP
+    reconstruir o mesmo histórico antes de propor algo novo.
     """
     import optuna
 
@@ -295,8 +381,11 @@ def run_gp(funnel: Funnel, space: Space, baseline: dict, seed: int, stopped_mode
     names = [f"u_{name}" for name in space.free]
     sobol = sobol_points(len(names), seed, 64)
     initial = [space.encode(baseline)] + sobol[:N_SOBOL_INITIAL]
-    fallback = iter(sobol[N_SOBOL_INITIAL:])
-    for u in initial:
+    replay = [space.encode(candidate) for candidate in funnel.replay_candidates()]
+    replayed_keys = {key_of(space.decode(u)) for u in replay}
+    queue = replay + [u for u in initial if key_of(space.decode(u)) not in replayed_keys]
+    fallback = (u for u in sobol[N_SOBOL_INITIAL:] if key_of(space.decode(u)) not in funnel.cache)
+    for u in queue:
         study.enqueue_trial(dict(zip(names, u)))
     stats = {"proposals": 0, "repeated": 0, "sobol_fallback": 0}
 
@@ -304,7 +393,7 @@ def run_gp(funnel: Funnel, space: Space, baseline: dict, seed: int, stopped_mode
         trial = study.ask()
         stats["proposals"] += 1
         candidate = space.decode([trial.suggest_float(name, 0.0, 1.0) for name in names])
-        repeated = key_of(candidate) in funnel.cache and stats["proposals"] > 1
+        repeated = key_of(candidate) in funnel.cache and stats["proposals"] > 1 and not funnel.replaying
         try:
             result = funnel.evaluate(candidate)
         except BudgetExhausted:
@@ -365,6 +454,7 @@ def run_nm(funnel: Funnel, space: Space, baseline: dict, seed: int, stopped_mode
 
 
 METHODS = {"gp": run_gp, "nm": run_nm}
+METHOD_PREFIX = {"gp": "gpbo", "nm": "nm"}
 
 
 # --- subcomandos --------------------------------------------------------------
@@ -383,19 +473,26 @@ def cmd_otimizar(args) -> None:
     space = Space(rules)
     baseline = validate_candidate(load_json(BASELINE_PATH), rules)
     tag = args.tag or datetime.now().strftime("%Y%m%d-%H%M%S")
+    prefix = METHOD_PREFIX[args.method]
     if args.backend == "real":
         if not args.confirmo_gpu and not args.dry_run:
             raise SystemExit("backend real gera imagens na GPU: só rode com --confirmo-gpu, após autorização humana")
         if git_branch() in ("main", "master"):
             raise SystemExit("a exceção ao protocolo vale só no branch do experimento, não no main")
-        out_dir = args.out or ROOT / "runs" / "real" / f"otim-{args.method}-{tag}"
+        out_root = (args.out_root or ROOT / "runs" / "real").resolve()
         if args.dry_run:
-            out_dir = ROOT / "runs" / "otimizador-dry-run" / f"{args.method}-{tag}"
-        backend = RealBackend(args.python, args.baseline_dir.resolve(), args.dry_run)
+            out_root = ROOT / "runs" / "otimizador-dry-run" / tag
+        # abspath, não resolve(): o Python do venv é symlink e precisa do caminho do ambiente
+        backend = RealBackend(Path(os.path.abspath(args.python)), args.baseline_dir.resolve(), args.dry_run)
     else:
-        out_dir = args.out or ROOT / "runs" / "otimizador-simulado" / f"{args.method}-{tag}"
-        backend = SimulatedBackend(out_dir, baseline)
-    funnel = Funnel(backend, space, baseline, out_dir, args.budget, args.method)
+        out_root = (args.out_root or ROOT / "runs" / "otimizador-simulado" / tag).resolve()
+        backend = SimulatedBackend(out_root, baseline)
+    header = {"backend": backend.name, "budget": args.budget, "seed": args.seed,
+              "gp_parados": args.gp_parados if args.method == "gp" else None,
+              "nm_initial_step": NM_INITIAL_STEP if args.method == "nm" else None,
+              "n_sobol_initial": N_SOBOL_INITIAL if args.method == "gp" else None}
+    funnel = Funnel(backend, space, baseline, out_root, prefix, args.budget, args.method, header)
+    funnel.crash_after = args.simular_queda
     original_candidate = CANDIDATE_PATH.read_text(encoding="utf-8") if CANDIDATE_PATH.exists() else None
     try:
         stats = METHODS[args.method](funnel, space, baseline, args.seed, args.gp_parados)
@@ -411,7 +508,7 @@ def cmd_otimizar(args) -> None:
         "nm_initial_step": NM_INITIAL_STEP if args.method == "nm" else None,
         "stats": stats,
     }
-    (out_dir / "resumo.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    (out_root / f"{prefix}-resumo.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(json.dumps(summary, indent=2, ensure_ascii=False))
     print(f"Log: {funnel.log_path}")
 
@@ -517,8 +614,10 @@ def main() -> None:
     opt.add_argument("--budget", type=int, default=DEFAULT_BUDGET, help="casos gerados (não configurações)")
     opt.add_argument("--seed", type=int, default=0, help="semente do otimizador (Sobol e GP), não da geração")
     opt.add_argument("--gp-parados", choices=("podar", "escopo"), default="podar")
-    opt.add_argument("--tag")
-    opt.add_argument("--out", type=Path)
+    opt.add_argument("--tag", help="só para simulado e dry-run: nome da pasta")
+    opt.add_argument("--out-root", type=Path,
+                     help="onde criar <prefixo>-NN-<escopo> e <prefixo>-log.jsonl (real: runs/real)")
+    opt.add_argument("--simular-queda", type=int, default=None, help=argparse.SUPPRESS)
     opt.add_argument("--python", type=Path, default=ROOT / ".venv" / "bin" / "python")
     opt.add_argument("--baseline-dir", type=Path, default=ROOT / "runs" / "real")
     opt.set_defaults(func=cmd_otimizar)

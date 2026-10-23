@@ -96,7 +96,19 @@ Cada execução escreve `log.jsonl`, com uma linha por etapa do funil. Cada linh
 `mean_improvement_pct`, `metric_improvement_pct` (as 7 métricas), `verdict`, `reason`,
 `case_wins` e `case_losses`, `rejected`, `pair_issues`, `new_best`,
 `best_full_improvement_pct` e `report`. Linhas `cache` registram reaproveitamento (custo
-0). A execução também escreve um `resumo.json`.
+0). No real, as pastas são `runs/real/gpbo-NN-<escopo>` e `runs/real/nm-NN-<escopo>`; o
+log é `runs/real/gpbo-log.jsonl` (ou `nm-log.jsonl`), gravado a cada etapa, e o resumo
+final é `<prefixo>-resumo.json`. Nada em `baseline-*` ou `candidate-*` é escrito.
+
+**Retomada.** Se o processo cair, basta rodar o mesmo comando. O script reconstrói do log
+o orçamento gasto, a melhor atual e todas as configurações medidas. Depois reinicia o
+otimizador e serve as propostas já registradas a partir do log, sem custo. O Nelder-Mead
+é determinístico e reproduz exatamente a mesma trajetória; isso está testado em
+`tests/test_otimizador_real.py`. No GP, as propostas antigas são reenfileiradas na ordem
+original. Se a proposta seguinte divergir, o log ganha uma linha `divergencia` e a busca
+continua. Uma etapa interrompida com a mesma configuração é retomada pelo próprio
+`run_batch.py`. Uma pasta interrompida de outra configuração é renomeada para
+`...-abandonado-<data>`, e os casos gerados nela contam no orçamento.
 
 A trajetória do agente é convertida para o mesmo formato a partir dos relatórios M4–M12:
 
@@ -107,49 +119,45 @@ python tools/otimizador_real.py agente
 A curva melhor melhora em 37 casos × casos gerados (CSV, e PNG se houver matplotlib):
 
 ```bash
-python tools/otimizador_real.py curva runs/otimizador-curvas/agente/log.jsonl runs/real/otim-gp-*/log.jsonl runs/real/otim-nm-*/log.jsonl
+python tools/otimizador_real.py curva runs/otimizador-curvas/agente/log.jsonl runs/real/gpbo-log.jsonl runs/real/nm-log.jsonl
 ```
 
-## Como rodar no real (só depois da confirmação do Matheus)
+## Como rodar no real (só com autorização humana para gerar na GPU)
 
-Rode no checkout principal, onde estão `data/`, `runs/real/` (com os baselines) e o
-`.venv` com torch.
+`tools/rodar_otimizadores_real.sh` roda GP-BO e depois Nelder-Mead, um de cada vez, com
+até 3 tentativas por método, retomando a cada uma. Ele pode rodar a partir de um
+worktree deste branch, sem trocar o branch do checkout principal:
 
-1. Troque para o branch do experimento:
-
-   ```bash
-   git switch claude/otimizador-real
-   ```
-
-2. Instale as dependências extras no `.venv` (scipy 1.13.1 e optuna 5.0.0):
+1. No worktree, crie o venv do otimizador e aponte `data/` para o checkout principal. O
+   venv fica em `.venv/`, ignorado pelo git; o link `data` vai em `.git/info/exclude`.
 
    ```bash
-   .venv/bin/pip install -r tools/requirements-otimizador.txt
-   ```
-
-3. Confira o comando e a primeira configuração, sem gerar nada:
-
-   ```bash
-   .venv/bin/python tools/otimizador_real.py otimizar --method nm --backend real --dry-run
-   ```
-
-4. Rode os dois métodos, um de cada vez (mesma GPU). Uma interrupção perde o estado do
-   otimizador, então rode com outra `--tag`; os relatórios de cada pasta continuam
-   reaproveitáveis à mão.
-
-   ```bash
-   .venv/bin/python tools/otimizador_real.py otimizar --method gp --backend real --confirmo-gpu --tag v1
+   ../../../.venv/bin/python -m venv .venv && .venv/bin/pip install "numpy==1.26.4" "torch==2.0.1" -r tools/requirements-otimizador.txt
    ```
 
    ```bash
-   .venv/bin/python tools/otimizador_real.py otimizar --method nm --backend real --confirmo-gpu --tag v1
+   ln -s "$PWD/../../../data" data
    ```
 
-5. Gere a curva com os três logs e registre cada configuração no CADERNO, na seção
-   "Experimento separado: otimizadores clássicos (O)".
+2. Confira o primeiro comando, sem gerar nada:
 
-Custo esperado: 269 casos por método, a mesma geração que as 9 configurações da busca M,
-ou seja, cerca de 2 × o tempo de GPU daquela busca.
+   ```bash
+   TEXTURE_EVALUATOR_REPO=../../../../synthetic-lung-ct-evaluation .venv/bin/python tools/otimizador_real.py otimizar --method gp --backend real --dry-run --python ../../../.venv/bin/python --baseline-dir ../../../runs/real
+   ```
+
+3. Rode em segundo plano. São cerca de 2,1 min por caso (medido em `candidate-12-full`),
+   ou seja, cerca de 9,5 h por método e 19 h no total.
+
+   ```bash
+   LAB_MAIN="$PWD/../../.." nohup tools/rodar_otimizadores_real.sh > ../../../runs/real/otimizadores-real.out 2>&1 &
+   ```
+
+4. Ao terminar, gere a curva com os três logs e registre cada configuração no CADERNO, na
+   seção "Experimento separado: otimizadores clássicos (O)".
+
+Em 2026-10-23 estava aberta no checkout principal uma sessão de agente (`claude
+--settings .agente/settings.json`), ociosa. Se ela gerar ao mesmo tempo, as duas disputam
+a GPU e o tempo dobra.
 
 Atenção ao primeiro ponto Sobol do GP com `--seed 0`: `steps` 87, `noise_level` 233,
 `latent` 0,932, `cond` 0,64. É uma região que o agente nunca tentaria e que provavelmente

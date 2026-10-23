@@ -38,19 +38,30 @@ class SpaceTest(unittest.TestCase):
 
 @unittest.skipUnless(HAS_DEPS, "scipy e optuna são opcionais")
 class FunnelSimulatedTest(unittest.TestCase):
-    def run_method(self, method, budget):
+    def run_method(self, method, budget, out=None, crash_after=None):
         import otimizador_real as runner
 
-        with tempfile.TemporaryDirectory() as tmp:
-            out = Path(tmp)
-            rules = json.loads(runner.SPACE_PATH.read_text(encoding="utf-8"))
-            space = runner.Space(rules)
-            baseline = json.loads(runner.BASELINE_PATH.read_text(encoding="utf-8"))
-            backend = runner.SimulatedBackend(out, baseline)
-            funnel = runner.Funnel(backend, space, baseline, out / method, budget, method)
+        if out is None:
+            tmp = tempfile.TemporaryDirectory()
+            self.addCleanup(tmp.cleanup)
+            out = Path(tmp.name)
+        rules = json.loads(runner.SPACE_PATH.read_text(encoding="utf-8"))
+        space = runner.Space(rules)
+        baseline = json.loads(runner.BASELINE_PATH.read_text(encoding="utf-8"))
+        backend = runner.SimulatedBackend(out, baseline)
+        header = {"backend": "simulado", "budget": budget, "seed": 0}
+        funnel = runner.Funnel(backend, space, baseline, out, runner.METHOD_PREFIX[method], budget, method, header)
+        funnel.crash_after = crash_after
+        try:
             runner.METHODS[method](funnel, space, baseline, 0, "podar")
-            rows = [json.loads(line) for line in funnel.log_path.read_text(encoding="utf-8").splitlines()]
-            return funnel, rows
+        except SystemExit:
+            pass
+        rows = [json.loads(line) for line in funnel.log_path.read_text(encoding="utf-8").splitlines()]
+        return funnel, rows
+
+    def stage_trace(self, rows):
+        return [(row["config_index"], row["scope"], json.dumps(row["candidate"], sort_keys=True))
+                for row in rows if row["event"] == "etapa"]
 
     def check_budget_and_log(self, funnel, rows, budget):
         self.assertLessEqual(funnel.used, budget)
@@ -67,6 +78,24 @@ class FunnelSimulatedTest(unittest.TestCase):
     def test_nelder_mead_respects_budget(self):
         funnel, rows = self.run_method("nm", 80)
         self.check_budget_and_log(funnel, rows, 80)
+
+    def test_nelder_mead_resumes_exactly_after_a_crash(self):
+        _, uninterrupted = self.run_method("nm", 120)
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            self.run_method("nm", 120, out=out, crash_after=4)
+            funnel, resumed = self.run_method("nm", 120, out=out)
+        self.assertEqual(self.stage_trace(resumed), self.stage_trace(uninterrupted))
+        self.assertEqual(funnel.used, uninterrupted[-1]["cases_cumulative"])
+        self.assertFalse(any(row["event"] == "divergencia" for row in resumed))
+
+    def test_gp_resumes_within_budget_after_a_crash(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            _, first = self.run_method("gp", 80, out=out, crash_after=5)
+            funnel, resumed = self.run_method("gp", 80, out=out)
+        self.assertEqual(self.stage_trace(resumed)[: len(self.stage_trace(first))], self.stage_trace(first))
+        self.check_budget_and_log(funnel, resumed, 80)
 
     def test_gp_respects_budget(self):
         funnel, rows = self.run_method("gp", 80)
