@@ -145,9 +145,52 @@ Orçamento = casos gerados pela busca M4–M12 = **269** (7 configurações até
 (5 + 5 + 27) = 259, mais M5 e M9 parados em 5 = 10). M1–M3 e o baseline ficam de fora.
 Desenho, decisões e comandos: `OTIMIZADOR_REAL.md`.
 
-Estado: código pronto e testado só no backend simulado; **nenhuma geração real feita**.
-Quando rodar, cada configuração vira uma linha aqui com prefixo "OG" (GP-BO) ou "ON"
-(Nelder-Mead).
+Rodado em 2026-10-23 com seed 42, cada método com 269 casos (o NM usou 268), sem quedas.
+Tabelas completas, por caso e por configuração, em `OTIMIZADOR_REAL.md`; logs em
+`resultados/otimizador-real/`. A "Melhor atual" acima **não mudou**: adotar o OG11 depende
+de decisão humana e, de preferência, da reavaliação com outras seeds (planejada, não
+autorizada).
+
+Resumo (37 casos, contra o baseline fixo):
+
+| | melhor | melhora média | nota | textura / final aprovada | atingido em |
+|---|---|---:|---:|---|---|
+| agente (M12) | steps 35, noise 1, eta 0,4, latent 1,0, cond 1,4 | +23,05% | 76,73 | 30 / 18 | 269 casos |
+| GP-BO (OG11) | steps 43, noise 2, **eta 0,767, latent 0,75, cond 1,5** | **+44,17%** | **85,79** | 34 / 29 | 119 casos |
+| Nelder-Mead (ON21) | steps 29, noise 1, eta 0,068, latent 1,008, cond 1,02 | +24,44% | 75,41 | 25 / 14 | 258 casos |
+
+Pela regra `melhor`, OG11 supera a M12 (29 vitórias, 8 derrotas) e ON21 também (22 / 15).
+Mas a nota e a textura do ON21 ficam **abaixo** das da M12, com NEx alto em 10 casos: a
+média de 7 métricas com teto superestima o ON21.
+
+Linhas que chegaram a 37 casos (o resto parou em 5 ou 10; lista completa em
+`OTIMIZADOR_REAL.md`):
 
 | # | método | configuração | escopo final | melhora vs baseline | veredito |
 |---|---|---|---|---|---|
+| OG10 | GP-BO | steps 36, noise 2, eta 0,469, latent 0,828, cond 1,372 | 37 | +19,84% | melhor (32/5) |
+| OG11 | GP-BO | steps 43, noise 2, eta 0,767, latent 0,75, cond 1,5 | 37 | +44,17% | melhor (30/7); melhor do GP |
+| ON01 | NM | steps 34 (resto baseline) | 37 | +5,26% | melhor (37/0) |
+| ON02 | NM | steps 25, noise 3 (resto baseline) | 37 | +9,41% | melhor (31/6) |
+| ON11 | NM | steps 29, noise 2, eta 0,046, latent 1,005, cond 1,046 | 37 | +24,05% | melhor (33/4) |
+| ON21 | NM | steps 29, noise 1, eta 0,068, latent 1,008, cond 1,02 | 37 | +24,44% | melhor (20/17); melhor do NM |
+
+O que este experimento ensina para a próxima busca:
+
+- **`latent_noise_scale` abaixo de 1 nunca foi testado pelo agente.** O GP achou o melhor
+  ponto em `latent` 0,75 (o limite), junto com `eta` 0,77 e `cond` 1,5. Acima de 1, a lição se
+  confirma: 14 dos 19 pontos do GP com `latent` > 1,02 tiveram rejeição, assim como ON04
+  (1,05), ON08 (1,025) e M5 (1,10).
+- **`eta` acima de 0,4 vale a pena investigar**, mas com cuidado: o ar fora do corpo sai
+  mais ruidoso. O desvio padrão no fundo foi 1,91% da faixa no OG11, contra 1,45% na M12.
+  As métricas de textura não veem esse ruído.
+- **`noise_level` 2 a 3 e `steps` 29 deram ganho grande com `eta` quase 0** (ON02, ON11).
+  Isso contradiz em parte "noise_level não é alavanca", que só tinha testado 10 e 50. O
+  ganho veio, porém, de energia e entropia GLCM/Wavelet, com NEx alto: confirmar antes
+  de tirar conclusão.
+- **Ressalvas do OG11:** 3 métricas no teto de 50 e 2 a menos de 1,3 ponto dele; seed
+  única; escolhido entre 41 configurações (maldição do vencedor); valores nos limites do
+  espaço. O placar marcou 4 cortes como "ruído" (verificação da sessão principal, não
+  refeita aqui).
+- **Custo da exploração:** o GP gastou 45% do orçamento (120 casos) em etapas com
+  rejeição, e o agente gastou 5 casos.

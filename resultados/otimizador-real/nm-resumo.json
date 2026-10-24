@@ -1,0 +1,31 @@
+{
+  "method": "nm",
+  "backend": "real",
+  "budget": 269,
+  "cases_used": 268,
+  "configs_measured": 23,
+  "best": {
+    "steps": 29,
+    "noise_level": 1,
+    "sampler": "ddim",
+    "scale_factor": 1.0,
+    "seed": 42,
+    "eta": 0.068,
+    "latent_noise_scale": 1.008,
+    "conditioning_noise_scale": 1.02
+  },
+  "best_full_improvement_pct": 24.4434,
+  "best_reports": {
+    "screen": "/Users/matheusbrito/Documents/projects/lung-agent-lab/runs/real/nm-21-screen/report.json",
+    "quick": "/Users/matheusbrito/Documents/projects/lung-agent-lab/runs/real/nm-21-quick/report.json",
+    "full": "/Users/matheusbrito/Documents/projects/lung-agent-lab/runs/real/nm-21-full/report.json"
+  },
+  "seed": 0,
+  "gp_parados": null,
+  "nm_initial_step": 0.1,
+  "stats": {
+    "calls": 25,
+    "converged": false,
+    "message": "orçamento esgotado"
+  }
+}

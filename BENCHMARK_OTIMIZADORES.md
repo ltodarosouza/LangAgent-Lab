@@ -161,6 +161,24 @@ baseline, e o registro de restrições e curvas sai certo. Ele não diz nada sob
 parâmetros melhores no LDM real. A resposta exige a versão real abaixo ou, como passo
 intermediário sem GPU, o surrogate proposto na próxima seção, que também tem limites.
 
+## Atualização: execução real (2026-10-23)
+
+A versão real foi rodada (ver `OTIMIZADOR_REAL.md`): mesmo funil 5 → 10 → 37, mesma
+régua, seed 42 e 269 casos gerados para cada método, o mesmo orçamento da busca M do
+agente.
+
+- **GP-BO com restrições:** +44,17% em 37 casos (nota 85,79), atingido com 119 casos. Mas
+  gastou 45% do orçamento em configurações com rejeição. O ponto achado fica nos limites
+  do espaço (`eta` 0,77, `latent` 0,75, `cond` 1,5): 3 métricas no teto de 50, fundo mais
+  ruidoso e seed única.
+- **Nelder-Mead:** +24,44% (nota 75,41, abaixo da M12) e não convergiu.
+- **Agente:** +23,05% (nota 76,73).
+
+Resposta provisória: com o mesmo orçamento, o GP-BO achou uma configuração bem melhor pela
+régua do lab. Ela veio de uma região que o agente não explorou (`latent` < 1, `eta` > 0,4).
+O Nelder-Mead empatou com o agente pela média, mas perdeu pela nota. Falta a reavaliação
+com outras seeds antes de concluir.
+
 ## Proposta (não implementada): surrogate ajustado às configurações reais
 
 Ideia: trocar o mock por um modelo ajustado às ~21 configurações reais do CADERNO (L1–L9,

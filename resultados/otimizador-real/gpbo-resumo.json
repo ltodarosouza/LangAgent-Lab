@@ -1,0 +1,31 @@
+{
+  "method": "gp",
+  "backend": "real",
+  "budget": 269,
+  "cases_used": 269,
+  "configs_measured": 41,
+  "best": {
+    "steps": 43,
+    "noise_level": 2,
+    "sampler": "ddim",
+    "scale_factor": 1.0,
+    "seed": 42,
+    "eta": 0.767,
+    "latent_noise_scale": 0.75,
+    "conditioning_noise_scale": 1.5
+  },
+  "best_full_improvement_pct": 44.1667,
+  "best_reports": {
+    "screen": "/Users/matheusbrito/Documents/projects/lung-agent-lab/runs/real/gpbo-11-screen/report.json",
+    "quick": "/Users/matheusbrito/Documents/projects/lung-agent-lab/runs/real/gpbo-11-quick/report.json",
+    "full": "/Users/matheusbrito/Documents/projects/lung-agent-lab/runs/real/gpbo-11-full/report.json"
+  },
+  "seed": 0,
+  "gp_parados": "podar",
+  "nm_initial_step": null,
+  "stats": {
+    "proposals": 75,
+    "repeated": 32,
+    "sobol_fallback": 32
+  }
+}
